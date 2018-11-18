@@ -1,6 +1,19 @@
 ---
 title: "Predicting the casualties during prolific days using SPC Outlooks and environmental factors"
-author: "Zoe Schroder and James Elsner"
+author: "Zoe Schroder/James Elsner"
 date: "11/18/2018"
-output: html_document
+output: github_notebook
+editor_options: 
+chunk_output_type: console
 ---
+
+Set working directory and load packages.
+```{r}
+library(lubridate)
+library(sf)
+library(tmap)
+library(USAboundaries)
+library(rgeos)
+library(dplyr)
+library(ggplot2)
+```
