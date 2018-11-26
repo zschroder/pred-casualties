@@ -150,8 +150,9 @@ BigDays.sfdfT <- Tor.sfdfT %>%
 dim(BigDays.sfdfT)
 ```
 
+## SPC Outlooks
 
+The SPC archive data extends from January 23, 2003 to present. (https://www.spc.noaa.gov/archive/)
 
-
-
-
+Data File Example: 
+https://www.spc.noaa.gov/cgi-bin-spc/getacrange.pl?date0=20110426&date1=20110426&csrf=0e9284c1e6fff8bc469a08cd5379c18197cc4fec/day1otlk_20110426_1630-shp.zip  
