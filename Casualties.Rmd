@@ -120,7 +120,7 @@ Add the group number to each tornado.
 Tor.sfdfT$groupNumber <- groupNumber
 ```
 
-Compute big day-level statistics. Keep only days with at least 10 tornadoes.
+Compute big day-level statistics. Keep only days with at least 10 tornadoes. 
 ```{r}
 BigDays.sfdfT <- Tor.sfdfT %>%
   group_by(cDate) %>%
@@ -128,10 +128,11 @@ BigDays.sfdfT <- Tor.sfdfT %>%
             Month = first(mo),
             FirstDate = first(date),
             LastDate = last(date),
-            Name = paste(FirstDate, "to", LastDate),
+            DateRange = paste(FirstDate, "to", LastDate),
             FirstcDate = first(cDate),
             LastcDate = last(cDate),
             ncD = n_distinct(cDate),
+            casualties = n_distinct(cas),
             nT = n(),
             n0 = sum(mag == 0),
             n1 = sum(mag == 1),
@@ -140,13 +141,19 @@ BigDays.sfdfT <- Tor.sfdfT %>%
             n4 = sum(mag == 4),
             n5 = sum(mag == 5),
             GroupTotalED = sum(ED),
-            Name2 = paste(round(GroupTotalED/10^12), "TW"),
+            GroupTotalEDinTW = paste(round(GroupTotalED/10^12), "TW"),
             maxEF = max(mag),
             nD = n_distinct(date),
             StartTime = first(DateTime),
             EndTime = last(DateTime),
             Duration = difftime(EndTime, StartTime, units = "secs")) %>%
   filter(nT >= 10)
+dim(BigDays.sfdfT)
+```
+Save the Big Days to a file `BigDays.RData`.
+```{r}
+save(BigDays.sfdfT, file = "BigDays.RData")
+load("BigDays.RData")
 dim(BigDays.sfdfT)
 ```
 
