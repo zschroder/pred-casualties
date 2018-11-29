@@ -1,5 +1,5 @@
 ---
-title: "Predicting the casualties during prolific days using SPC Outlooks and environmental factors"
+title: "Relatonship between casualties and environmental factors on the most prolific tornado days"
 author: "Zoe Schroder/James Elsner"
 date: "11/18/2018"
 output: github_notebook
