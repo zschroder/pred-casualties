@@ -122,7 +122,7 @@ Add the group number to each tornado.
 Tor.sfdfT$groupNumber <- groupNumber
 ```
 
-Create an ID for unique big days. It needs to have the group number and the cDate
+Create an ID for unique big days. It needs to have the group number and the cDate because there are multiple group numbers in each cDate. Similarly, there are multiple cDates in each groupnumber. An ID helps retrieve appropriate/unique big days. 
 ```{r}
 Tor.sfdfT <- Tor.sfdfT %>%
    mutate(ID = paste0(gsub("-", "", cDate), groupNumber))
@@ -131,7 +131,7 @@ Tor.sfdfT <- Tor.sfdfT %>%
 Compute big day-level statistics. Keep only days with at least 10 tornadoes. 
 ```{r, eval = FALSE}
 BigDays.sfdfT <- Tor.sfdfT %>%
-  group_by(ID) %>%
+  group_by(ID, groupNumber, cDate) %>%
   summarize(Year = first(Year),
             Month = first(mo),
             FirstDate = first(date),
@@ -159,9 +159,15 @@ BigDays.sfdfT <- Tor.sfdfT %>%
 dim(BigDays.sfdfT)
 ```
 
+Extract a vector of the big days. Save as a .csv for NARR download. 
+```{r, eval = FALSE}
+bigdays <- BigDays.sfdfT$cDate
+write.csv(bigdays, "BigDays.csv")
+```
+
+
 Save the Big Days to a file `BigDays.RData`.
 ```{r}
-#write.csv(BigDays.sfdfT, "BigDays.csv")
 #save(BigDays.sfdfT, file = "BigDays.RData")
 load("BigDays.RData")
 dim(BigDays.sfdfT)
