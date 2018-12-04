@@ -140,7 +140,7 @@ BigDays.sfdfT <- Tor.sfdfT %>%
             FirstcDate = first(cDate),
             LastcDate = last(cDate),
             ncD = n_distinct(cDate),
-            casualties = n_distinct(cas),
+            casualties = sum(cas),
             nT = n(),
             n0 = sum(mag == 0),
             n1 = sum(mag == 1),
@@ -195,13 +195,14 @@ BigDayCentroids.sfdfT$groupArea <- st_area(st_convex_hull(BigDays.sfdfT))
 BigDayCentroids.sfdfT$groupDensity <- BigDayCentroids.sfdfT$nT/BigDayCentroids.sfdfT$groupArea
 ```
 
+Set the state and county borders. 
 ```{r}
 sts <- state.name[!state.name %in% c("Alaska", "Hawaii")]
 stateBorders <- us_states(states = sts)
 counties.sf <- us_counties()
 ```
 
-Plot the centroids of all big days. Size by the number of tornadoes
+Plot the centroids of all big days. Size by the number of casualties. ** The legend is wrong, but the sizes appear correct **
 ```{r}
 tm_shape(stateBorders) + 
   tm_borders(col = "darkgray", alpha = 1) +
@@ -214,12 +215,12 @@ tm_shape(counties.sf) +
   tm_format_World(legend.position = c("right", "bottom"),
                    attr.position = c("left", "bottom"),
                    legend.frame = FALSE,
-                   #title = "May 30th Tornado Group",
+                   #title = "Big Day centroids",
                    #title.size = 1.3,
                    #title.position = c("left", "TOP"),
                    inner.margins = c(.05, .05, .1, .05)) +
 tm_shape(BigDayCentroids.sfdfT) +
-  tm_symbols(size = "nT", title.size = "Count", legend.size.is.portrait = FALSE, shape =24) + 
+  tm_symbols(size = "casualties", title.size = "Count", legend.size.is.portrait = FALSE, shape =24) + 
   tm_layout(
   legend.title.size=1,
   legend.text.size = 0.6,
@@ -228,14 +229,55 @@ tm_shape(BigDayCentroids.sfdfT) +
   legend.bg.alpha = 1)
 ```
 
+Get the casualty count by state:
+```{r}
+casualty <- Tor.sfdfT %>%
+  group_by(st) %>%
+  summarize(cas = n())
+
+
+states.sf <- us_states()
+
+states.sf <- states.sf %>%
+  filter(!stusps %in% c("AK", "PR", "HI")) %>%
+  arrange(-desc(state_name))
+
+#states.sf$totalcasualties <- colSums(Tor.sfdfT)
+
+
+
+tm_shape(states.sf) + 
+  tm_borders(col = "darkgray", alpha = 1) +
+  tm_compass() + tm_scale_bar() +
+  tm_layout(legend.bg.color = "white", legend.text.size = .75)
+tm_shape(counties.sf) +
+   tm_fill("GroupDayCount",
+            title = "Count",
+            palette = "Reds", n = 5) +
+  tm_borders(col = "gray", alpha = .3) +
+  tm_compass() + 
+  tm_scale_bar() +
+  tm_layout(legend.position = c("right", "bottom"),
+                   attr.position = c("left", "bottom"),
+                   legend.frame = FALSE,
+                   #title = "Tornado Group Days by County [1994-2017]",
+                   #title.size = 1.3,
+                   #title.position = c("left", "TOP"),
+                   inner.margins = c(.05, .05, .1, .05))
+
+```
+
 Plot the number of casualties by state. 
 ```{r}
-
+%>%
+  arrange(asc(nT))
 ```
 
 Time Series of casualty counts over time. 
 ```{r}
-
+casualty <- Tor.sfdfT %>%
+  group_by(st) %>%
+  summarize(cas = n())
 ```
 
 Plot the relationship between GroupDayTotalED (ATE) and casualties. 
