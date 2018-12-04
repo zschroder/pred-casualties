@@ -23,7 +23,7 @@ library(lubridate)
 ## Part 1: Tornado Data
 
 The newest GIS shapefile contains missing geometries for more than 30% of the tornadoes. The number of missing geometries is highest after 1995. Instead here we use the csv file from https://www.spc.noaa.gov/wcm/#data  Use the start lon/lat and create a `sp` object then convert to `sf`. Set the coordinate reference system (crs) to ESPG 4326.
-```{r}
+```{r, eval = FALSE}
 Tor.df <- read.csv(file = "1950-2017_actual_tornadoes.csv")
 Tor.spdf <- Tor.df
 rm(Tor.df)
@@ -33,7 +33,7 @@ st_crs(Tor.sfdf) <- 4326
 ```
 
 Remove tornadoes in Hawaii, Alaska, and Puerto Rico and those occurring before 1994. That year marks the beginning of comprehensive WSR-88D radar. For missing EF ratings use the modification rules (if/else) defined here: https://www.spc.noaa.gov/wcm/OneTor_F-scale-modifications.pdf
-```{r}
+```{r, eval = FALSE}
 Tor.sfdf <- Tor.sfdf %>%
   filter(yr >= 1994,
          !st %in% c("AK", "PR", "HI")) %>%
@@ -42,7 +42,7 @@ Tor.sfdf <- Tor.sfdf %>%
 ```
 
 Add a data/time column also add columns for path length, width, and area in metric units. Leave the time zone as native CDT. Create a convective day (6AM to 6AM) column taking hours 00:00:00 -> 05:59:59 and assigning it to the previous date (this associates the previous day's date to tornadoes occurring up to 6 hours after local midnight).
-```{r}
+```{r, eval = FALSE}
 Tor.sfdf <- Tor.sfdf %>%
   mutate(dy = format(as.Date(date,format="%m/%d/%y"), "%d"),
          DateTime = as.POSIXct(paste(yr, mo, dy, time), format = "%Y%m%d%H:%M:%S"),
@@ -69,7 +69,7 @@ $$
 E = A_p \rho \sum_{j=0}^{J} w_j v_j^{3},
 $$
 where $A_p$ is the area of the path, $\rho$ is area density [1 kg/m^3]  $v_j$ is the midpoint wind speed for each rating, and $w_j$ is the corresponding fraction of path area by EF rating. With no upper bound on the EF5 wind speeds, the midpoint wind speed is set at 97 m~s$^{-1}$ (7.5 m~s$^{-1}$ above the threshold wind speed consistent with the EF4 midpoint speed relative to its threshold)
-```{r}
+```{r, eval = FALSE}
 perc <- c(1, 0, 0, 0, 0, 0, 
           .772, .228, 0, 0, 0, 0,
           .616, .268, .115, 0, 0, 0,
@@ -87,7 +87,7 @@ Tor.sfdf <- Tor.sfdf %>%
 ```
 
 Determine the distance between tornadoes in space and time. Use a projection, not lat/lon. See https://epsg.io/102004. Extract the coordinates of the start locations as a N by 2 matrix, where N is the number of tornadoes. Also extract the date-time as a vector of class `POSIXct`.
-```{r}
+```{r, eval = FALSE}
 Tor.sfdfT <- st_transform(Tor.sfdf, crs = 102004)
 space <- st_coordinates(Tor.sfdfT)
 time <- Tor.sfdf$DateTime
@@ -96,7 +96,7 @@ time <- Tor.sfdf$DateTime
 Next compute pairwise Euclidean distances in space and, separately, in time using the `dist()` function. Divide the spatial distance by 10 so that the values are commensurate with the time 'distance' based on the assumption of 10 meters every second for an average speed of tornado-generating storms. 
 
 Compare: Distance from New York to Denver is 2.622 x 10^6 meters. There are 3.154 x 10^7 seconds in a year. This will capture the historic multiday tornado outbreaks. For analysis we want to consider each day in the multiday group separately. As the value of the divisor increases cluster areas get larger. Remove `ds` and `dt` to free memory.
-```{r}
+```{r, eval = FALSE}
 ds <- dist(space) / 10
 dt <- dist(time)
 dst <- ds + dt
@@ -110,7 +110,7 @@ Next group the tornadoes based on the space-time distances. This is done with th
 The single linkage method (`method = "single"`) is related to the minimal spanning tree (MST) and adopts a 'friends of friends' grouping strategy. An edge-weighted graph is a graph where each edge has a weight (or cost). Here weights are space-time distances between tornadoes. A MST of an edge-weighted graph is a spanning tree whose weight (the sum of the weights of its edges) is no larger than the weight of any other spanning tree. A spanning tree of a graph on N vertices (tornado centroids) is a subset of N-1 edges that form a tree (Skiena 1990, p. 227).
  
 The `cutree()` function is used to extract a group number for each tornado. Tornadoes in each group are close in space & time. Here the tree is cut at a height of 50000 space-time units. Making `h` smaller results in smaller groups (fewer tornadoes per group).
-```{r}
+```{r, eval = FALSE}
 stime <- proc.time()
 tree <- hclust(dst, method = "single")
 groupNumber <- as.integer(cutree(tree, h = 50000))
@@ -118,14 +118,14 @@ proc.time() - stime
 ```
 
 Add the group number to each tornado. 
-```{r}
+```{r, eval = FALSE}
 Tor.sfdfT$groupNumber <- groupNumber
 ```
 
 Compute big day-level statistics. Keep only days with at least 10 tornadoes. 
-```{r}
+```{r, eval = FALSE}
 BigDays.sfdfT <- Tor.sfdfT %>%
-  group_by(cDate) %>%
+  group_by(groupNumber, cDate) %>%
   summarize(Year = first(Year),
             Month = first(mo),
             FirstDate = first(date),
@@ -154,74 +154,21 @@ dim(BigDays.sfdfT)
 ```
 Save the Big Days to a file `BigDays.RData`.
 ```{r}
-save(BigDays.sfdfT, file = "BigDays.RData")
+#save(BigDays.sfdfT, file = "BigDays.RData")
 load("BigDays.RData")
 dim(BigDays.sfdfT)
 ```
 
-## NARR data: 
-Data is downloaded from NCAR's North American Regional Reanalysis (https://rda.ucar.edu/datasets/ds608.0/#!access). It extends from 1-1-1979 to 11-1-2018. Use the NCAR NARR 3-hourly files.  
-
-Spatial Extent: 
-Longitude Range: Westernmost = 148.64E Easternmost = 2.568W
-Latitude Range: Southernmost = 0.897N Northernmost = 85.333N 
-
-The list of all variables can be found here: http://www.emc.ncep.noaa.gov/mmb/rreanl/merged_land_AWIP32.pdf 
-
-```{r}
-df <- BigDays.sfdfT %>%
-  mutate(YrMoDa = gsub("-", "", BigDays.sfdfT$cDate),
-         ztime = 18,
-         slug = paste0("merged_AWIP32.",YrMoDa, ztime)) 
-slug <- df$slug
+Pull out the individual tornadoes associated with each Big Day. 
+```{r, eval = FALSE}
+days <- BigDays.sfdfT$cDate
+Tor.sfdfT <- Tor.sfdfT %>%
+  filter(cDate %in% days) 
 ```
 
+Save the Tornadoes to a file `BigDayTornadoes.RData`.
 ```{r}
-aCAPE <- numeric()
-aHLCY <- numeric()
-aCIN <- numeric()
-aUSTM <- numeric()
-aVSTM <- numeric()
-aBS <- numeric()
-aRATIO <- numeric()
-mCAPE <- numeric()
-mHLCY <- numeric()
-mCIN <- numeric()
-mUSTM <- numeric()
-mVSTM <- numeric()
-mBS <- numeric()
- 
-#i = 652 for example!
-for(i in 1:length(slug)){
-  print(i)
-  rb <- brick(paste0("NCARNARR/merged_AWIP32.", df$YrMoDa[i], df$ztime[i]))
-  CAPE.rl <- raster(rb, layer = 375)
-  HLCY.rl <- raster(rb, layer = 323)
-  CIN.rl <- raster(rb, layer = 376)
-  USTM.rl <- raster(rb, layer = 324)
-  VSTM.rl <- raster(rb, layer = 325)
-  BS.rl <- sqrt(USTM.rl^2 + VSTM.rl^2)
-  RATIO.rl <- CAPE.rl/abs(CIN.rl)
-  aCAPE <- c(aCAPE, as.numeric(raster::extract(CAPE.rl, df[i, ], fun = mean)))
-  aHLCY <- c(aHLCY, as.numeric(raster::extract(HLCY.rl, df[i, ], fun = mean)))
-  aCIN <- c(aCIN, as.numeric(raster::extract(CIN.rl, df[i, ], fun = mean)))
-  aUSTM <- c(aUSTM, as.numeric(raster::extract(USTM.rl, df[i, ], fun = mean)))
-  aVSTM <- c(aVSTM, as.numeric(raster::extract(VSTM.rl, df[i, ], fun = mean)))
-  aBS <- c(aBS, as.numeric(raster::extract(BS.rl, df[i, ], fun = mean)))
-  aRATIO <- c(aRATIO, as.numeric(raster::extract(RATIO.rl, df[i, ], fun = mean)))
-  mCAPE <- c(mCAPE, as.numeric(raster::extract(CAPE.rl, df[i, ], fun = max)))
-  mHLCY <- c(mHLCY, as.numeric(raster::extract(HLCY.rl, df[i, ], fun = max)))
-  mCIN <- c(mCIN, as.numeric(raster::extract(CIN.rl, df[i, ], fun = min)))
-  mUSTM <- c(mUSTM, as.numeric(raster::extract(USTM.rl, df[i, ], fun = max)))
-  mVSTM <- c(mVSTM, as.numeric(raster::extract(VSTM.rl, df[i, ], fun = max)))
-  mBS <- c(mBS, as.numeric(raster::extract(BS.rl, df[i, ], fun = max)))
-}
+#save(Tor.sfdfT, file = "BigDayTornadoes.RData")
+load("BigDayTornadoes.RData")
+dim(Tor.sfdfT)
 ```
-
-
-## SPC Outlooks
-
-The SPC archive data extends from January 23, 2003 to present. (https://www.spc.noaa.gov/archive/)
-
-Data File Example: 
-https://www.spc.noaa.gov/cgi-bin-spc/getacrange.pl?date0=20110426&date1=20110426&csrf=0e9284c1e6fff8bc469a08cd5379c18197cc4fec/day1otlk_20110426_1630-shp.zip  
