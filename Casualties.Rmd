@@ -165,7 +165,6 @@ bigdays <- BigDays.sfdfT$cDate
 write.csv(bigdays, "BigDays.csv")
 ```
 
-
 Save the Big Days to a file `BigDays.RData`.
 ```{r}
 #save(BigDays.sfdfT, file = "BigDays.RData")
@@ -186,6 +185,66 @@ Save the Tornadoes to a file `BigDayTornadoes.RData`.
 load("BigDayTornadoes.RData")
 dim(Tor.sfdfT)
 ```
+
+## Make some images: 
+
+Get the centroid (central point of the tornado activity) for each big day. 
+```{r}
+BigDayCentroids.sfdfT <- st_centroid(BigDays.sfdfT)
+BigDayCentroids.sfdfT$groupArea <- st_area(st_convex_hull(BigDays.sfdfT))
+BigDayCentroids.sfdfT$groupDensity <- BigDayCentroids.sfdfT$nT/BigDayCentroids.sfdfT$groupArea
+```
+
+```{r}
+sts <- state.name[!state.name %in% c("Alaska", "Hawaii")]
+stateBorders <- us_states(states = sts)
+counties.sf <- us_counties()
+```
+
+Plot the centroids of all big days. Size by the number of tornadoes
+```{r}
+tm_shape(stateBorders) + 
+  tm_borders(col = "darkgray", alpha = 1) +
+  tm_compass() + tm_scale_bar() +
+  tm_layout(legend.bg.color = "white", legend.text.size = .75) +
+tm_shape(counties.sf) +
+  tm_borders(col = "gray", alpha = .3) +
+  tm_compass() + 
+  tm_scale_bar() +
+  tm_format_World(legend.position = c("right", "bottom"),
+                   attr.position = c("left", "bottom"),
+                   legend.frame = FALSE,
+                   #title = "May 30th Tornado Group",
+                   #title.size = 1.3,
+                   #title.position = c("left", "TOP"),
+                   inner.margins = c(.05, .05, .1, .05)) +
+tm_shape(BigDayCentroids.sfdfT) +
+  tm_symbols(size = "nT", title.size = "Count", legend.size.is.portrait = FALSE, shape =24) + 
+  tm_layout(
+  legend.title.size=1,
+  legend.text.size = 0.6,
+  legend.position = c("right","bottom"),
+  legend.bg.color = "white",
+  legend.bg.alpha = 1)
+```
+
+Plot the number of casualties by state. 
+```{r}
+
+```
+
+Time Series of casualty counts over time. 
+```{r}
+
+```
+
+Plot the relationship between GroupDayTotalED (ATE) and casualties. 
+```{r}
+
+```
+
+
+
 
 ## NARR data: 
 Data is downloaded from NCAR's North American Regional Reanalysis (https://rda.ucar.edu/datasets/ds608.0/#!access). It extends from 1-1-1979 to 11-1-2018. Use the NCAR NARR 3-hourly files.  
