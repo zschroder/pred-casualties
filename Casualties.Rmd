@@ -1,5 +1,5 @@
 ---
-title: "Relatonship between casualties and environmental factors on the most prolific tornado days"
+title: "Predicting the casualties during prolific days using SPC Outlooks and environmental factors"
 author: "Zoe Schroder/James Elsner"
 date: "11/18/2018"
 output: github_notebook
@@ -161,6 +161,7 @@ dim(BigDays.sfdfT)
 
 Save the Big Days to a file `BigDays.RData`.
 ```{r}
+#write.csv(BigDays.sfdfT, "BigDays.csv")
 #save(BigDays.sfdfT, file = "BigDays.RData")
 load("BigDays.RData")
 dim(BigDays.sfdfT)
@@ -168,9 +169,9 @@ dim(BigDays.sfdfT)
 
 Pull out the individual tornadoes associated with each Big Day. 
 ```{r, eval = FALSE}
-groups <- BigDays.sfdfT$groupNumber
+groups <- BigDays.sfdfT$ID
 Tor.sfdfT <- Tor.sfdfT %>%
-  filter(groupNumber %in% groups) 
+  filter(ID %in% groups) 
 ```
 
 Save the Tornadoes to a file `BigDayTornadoes.RData`.
