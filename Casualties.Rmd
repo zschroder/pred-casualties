@@ -315,6 +315,7 @@ df <- df %>%
 slug <- df$slug
 ```
 
+Read the grib files as raster bricks and assign the CAPE and helicity variables to separate raster layers. Extract the average (and extreme) environmental values within each of the big days in large groups hulls. 
 ```{r}
 aCAPE <- numeric()
 aHLCY <- numeric()
@@ -357,6 +358,9 @@ for(i in 1:length(slug)){
   mBS <- c(mBS, as.numeric(raster::extract(BS.rl, df[i, ], fun = max)))
 }
 ```
+rows 306 and 549 produce these arguments: 
+no non-missing arguments to min; returning Infno non-missing arguments to max; returning -Infno non-missing arguments to min; returning Infno non-missing arguments to max; returning -Infno non-missing arguments to min; returning Infno non-missing arguments to max; returning -Infno non-missing arguments to min; returning  
+
 
 Add environmental data values to the group day means data frame.
 ```{r}
@@ -368,6 +372,28 @@ df$mHLCY <- mHLCY
 df$mCIN <- mCIN
 df$mUSTM <- mUSTM
 df$mVSTM <- mVSTM
+df$aUSTM <- aUSTM
+df$aVSTM <- aVSTM
+df$aBS <- aBS
+df$aRATIO <- aRATIO
+df$mBS <- mBS
+```
+
+Scale the variables
+```{r}
+df$aCAPE2 <- df$aCAPE/1000
+df$aHLCY2 <- df$aHLCY/100
+df$aCIN2 <- df$aCIN/100
+df$aBS2 <- df$aBS/10
+df$aUSTM2 <- df$aUSTM/10
+df$aVSTM2 <- df$aVSTM/10
+
+df$mCAPE2 <- df$mCAPE/1000
+df$mHLCY2 <- df$mHLCY/100
+df$mCIN2 <- df$mCIN/100
+df$mBS2 <- df$mBS/10
+df$mUSTM2 <- df$mUSTM/10
+df$mVSTM2 <- df$mVSTM/10
 ```
 
 ```{r}
