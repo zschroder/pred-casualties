@@ -229,11 +229,23 @@ tm_shape(BigDayCentroids.sfdfT) +
   legend.bg.alpha = 1)
 ```
 
-Get the casualty count by state:
-```{r}
+Get the casualty count by state into a single data frame
+```{r, eval = FALSE}
 casualty <- Tor.sfdfT %>%
   group_by(st) %>%
   summarize(cas = n())
+
+missstates <- c("AZ", "CA", "NV", "OR", "RI", "UT", "WA", "ID","DC")
+misscas <- as.integer(rep(0, 9))
+missing <- cbind(missstates, misscas)
+st <- as.character(casualty$st)
+test <- c(st, missstates)
+
+cascount <- casualty$cas
+test2 <- c(cascount, misscas)
+
+test3 <- cbind(test, test2)
+test3 <- test3[order(test),]
 
 states.sf <- us_states()
 
@@ -241,12 +253,25 @@ states.sf <- states.sf %>%
   filter(!stusps %in% c("AK", "PR", "HI")) %>%
   arrange(-desc(state_name))
 
-#states.sf$totalcasualties <- colSums(Tor.sfdfT)
+states.sf <- states.sf[order(states.sf$state_abbr),]
+x <- as.data.frame(test3)
 
+states.sf <- cbind(states.sf, x$test2)
+states.sf$cascount <- states.sf$x.test2
 
+states.sf$col2 <- as.numeric(as.character(states.sf$cascount))
+states.sf <- states.sf[order(states.sf$col2),]
+```
 
+Map the casualty count by state: 
+```{r}
 tm_shape(states.sf) + 
   tm_borders(col = "darkgray", alpha = 1) +
+     tm_fill("col2",
+            title = "Count",
+            breaks = c(0, 200, 400, 600, 800, 1000, 1200, 1400),
+            style = "fixed", 
+            palette = "Reds", n = 37) +
   tm_compass() + tm_scale_bar() +
   tm_layout(legend.bg.color = "white", legend.text.size = .75)
 ```
@@ -361,7 +386,6 @@ for(i in 1:length(slug)){
 rows 306 and 549 produce these arguments: 
 no non-missing arguments to min; returning Infno non-missing arguments to max; returning -Infno non-missing arguments to min; returning Infno non-missing arguments to max; returning -Infno non-missing arguments to min; returning Infno non-missing arguments to max; returning -Infno non-missing arguments to min; returning  
 
-
 Add environmental data values to the group day means data frame.
 ```{r}
 df$aCAPE <- aCAPE
@@ -399,8 +423,13 @@ df$mVSTM2 <- df$mVSTM/10
 ```{r}
 save(df, file = "df.RData")
 load("df.RData")
-dim(Tor.sfdfT)
+dim(df)
 ```
+**What do we do about days that have max and average CAPE 0? ** 4-21-2001 and 5-23-2010  
+```{r}
+
+```
+
 
 ## SPC Outlooks
 
