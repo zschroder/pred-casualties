@@ -393,7 +393,7 @@ library(raster)
 #i = 652 for example!
 for(i in 1:length(slug)){
   print(i)
-  rb <- brick(paste0("/Volumes/My Passport for Mac/PhD_Program/NCARNARR/Files/18Z/", BigDays.sfdfT$slug[i]))
+  rb <- brick(paste0("/Volumes/My Passport for Mac/PhD_Program/NCARNARR/Files/18Z/", BigDays.sfdfT$slug))
   CAPE.rl <- raster(rb, layer = 375)
   HLCY.rl <- raster(rb, layer = 323)
   CIN.rl <- raster(rb, layer = 376)
@@ -434,7 +434,7 @@ BigDays.sfdfT$aRATIO <- aRATIO
 BigDays.sfdfT$mBS <- mBS
 ```
 
-Scale the variables
+Scale the variables to make them easier to read and input for models. 
 ```{r, eval = FALSE}
 BigDays.sfdfT$aCAPE2 <- BigDays.sfdfT$aCAPE/1000
 BigDays.sfdfT$aHLCY2 <- BigDays.sfdfT$aHLCY/100
@@ -451,6 +451,7 @@ BigDays.sfdfT$mUSTM2 <- BigDays.sfdfT$mUSTM/10
 BigDays.sfdfT$mVSTM2 <- BigDays.sfdfT$mVSTM/10
 ```
 
+Save the data. 
 ```{r}
 #save(BigDays.sfdfT, file = "BigDays.RData")
 load("BigDays.RData")
@@ -458,11 +459,307 @@ dim(BigDays.sfdfT)
 ```
 **What do we do about days that have max and average CAPE 0? ** 4-21-2001, 5-23-2010, and 5-30-2003 (You do not have this issue with >30)
 
-```{r}
+############################
+## Check the 00 CAPE days ##
+############################
 
+Extract the centroid, hull, and tornadoes for April 21
+```{r}
+BigDay421 <- BigDays.sfdfT %>%
+  filter(cDate == "2001-04-21")
+
+Torn421 <- Torn.sfT %>%
+  filter(ID == "200104212377")
+
+Hull421 <- st_convex_hull(BigDay421)
 ```
 
-Try 30...
+Download the environmental data for the April 21, 2001 big day. Convert to a raster and transform the big day data to the same CRS as the environmental factors. 
+```{r}
+rb <- brick(paste0("/Volumes/My Passport for Mac/PhD_Program/NCARNARR/Files/18Z/", Hull421$slug))
+
+cape <- raster(rb, layer = 375)
+hlcy <- raster(rb, layer = 323)
+cin <- raster(rb, layer = 376)
+
+capeLL <- projectRaster(cape, crs = "+init=epsg:4326")
+cinLL <- projectRaster(cin, crs = "+init=epsg:4326")
+hlcyLL <- projectRaster(hlcy, crs = "+init=epsg:4326")
+
+sfdfTll <- st_transform(Hull421, crs = "+init=epsg:4326")
+r <- raster(extent(sfdfTll), resolution = res(capeLL))
+
+nT.r <- rasterize(sfdfTll, r, fun = 'first')
+
+cape.r <- projectRaster(capeLL, nT.r) 
+cin.r <- projectRaster(cinLL, nT.r)
+hlcy.r <- projectRaster(hlcyLL, nT.r)  
+  
+```
+Get the average CAPE, CIN, and HLCY values:
+```{r}
+aCAPE <- c()
+aCIN <- c()
+aHLCY <- c()
+
+aCAPE <- c(aCAPE, as.numeric(raster::extract(cape.r, BigDay421, fun = mean)))
+aHLCY <- c(aHLCY, as.numeric(raster::extract(hlcy.r, BigDay421, fun = mean)))
+aCIN <- c(aCIN, as.numeric(raster::extract(cin.r, BigDay421, fun = mean)))
+  
+BigDay421$aCAPE <- aCAPE
+BigDay421$aHLCY <- aHLCY
+BigDay421$aCIN <- aCIN
+```
+
+Get the maximum values: 
+```{r}
+mCAPE <- c()
+mCIN <- c()
+mHLCY <- c()
+
+mCAPE <- c(mCAPE, as.numeric(raster::extract(cape.r, BigDay421, fun = max)))
+mHLCY <- c(mHLCY, as.numeric(raster::extract(hlcy.r, BigDay421, fun = max)))
+mCIN <- c(mCIN, as.numeric(raster::extract(cin.r, BigDay421, fun = min)))
+
+BigDay421$mCAPE <- mCAPE
+BigDay421$mHLCY <- mHLCY
+BigDay421$mCIN <- mCIN
+```
+
+Plot the April 21, 2001 event with the CAPE values
+```{r}
+sts <- state.name[!state.name %in% c("Alaska", "Hawaii")]
+stateBorders <- us_states(states = sts)
+
+counties <- us_counties()
+counties.sf <- counties %>%
+  filter(!state_abbr %in% c("AK", "PR", "HI")) 
+
+tm_shape(cape.r) +
+  tm_raster(title = "CAPE (J/kg)", n = 5) +
+tm_shape(Hull421) +
+  tm_borders(col = "red", lwd = 3) +
+tm_shape(BigDay421) +
+  tm_symbols(size = .75, col = "black", shape = 24) +
+tm_shape(Torn421) +
+  tm_symbols(size = 1, col = "red") +
+tm_shape(stateBorders) + 
+  tm_borders(col = "gray15", alpha = 1) +
+  tm_compass(size = 5) +
+  tm_scale_bar(width = 0.5, size = 1.25, lwd = 2) +
+  tm_layout(legend.bg.color = "white", legend.text.size = .75) +
+tm_shape(counties.sf) +
+  tm_borders(col = "gray40", alpha = .3) +
+  tm_scale_bar(width = 8, size = 8) +
+  tm_format("World", legend.position = c("right", "bottom"),
+                   attr.position = c("left", "bottom"),
+                   legend.frame = FALSE,
+                   #title = "April 21st Tornado Group",
+                   #title.size = 1.3,
+                   #title.position = c("left", "TOP"),
+                   inner.margins = c(.2, .2, .2, .2)) 
+```
+** ISSUE: The hull overlaps a 100 to 200 pixel. So, why is the max CAPE value only 31.5?**
+
+## 5 - 23 - 2010
+
+Extract the centroid, hull, and tornadoes for May 23
+```{r}
+BigDay523 <- BigDays.sfdfT %>%
+  filter(cDate == "2010-05-23")
+
+Torn523 <- Torn.sfT %>%
+  filter(ID == "201005234953")
+
+Hull523 <- st_convex_hull(BigDay523)
+```
+
+Download the environmental data for the May 23, 2010 big day. Convert to a raster and transform the big day data to the same CRS as the environmental factors. 
+```{r}
+rb <- brick(paste0("/Volumes/My Passport for Mac/PhD_Program/NCARNARR/Files/18Z/", Hull523$slug))
+
+cape <- raster(rb, layer = 375)
+hlcy <- raster(rb, layer = 323)
+cin <- raster(rb, layer = 376)
+
+capeLL <- projectRaster(cape, crs = "+init=epsg:4326")
+cinLL <- projectRaster(cin, crs = "+init=epsg:4326")
+hlcyLL <- projectRaster(hlcy, crs = "+init=epsg:4326")
+
+sfdfTll <- st_transform(Hull523, crs = "+init=epsg:4326")
+r <- raster(extent(sfdfTll), resolution = res(capeLL))
+
+nT.r <- rasterize(sfdfTll, r, fun = 'first')
+
+cape.r <- projectRaster(capeLL, nT.r) 
+cin.r <- projectRaster(cinLL, nT.r)
+hlcy.r <- projectRaster(hlcyLL, nT.r)  
+  
+```
+Get the average CAPE, CIN, and HLCY values:
+```{r}
+aCAPE <- c()
+aCIN <- c()
+aHLCY <- c()
+
+aCAPE <- c(aCAPE, as.numeric(raster::extract(cape.r, BigDay523, fun = mean)))
+aHLCY <- c(aHLCY, as.numeric(raster::extract(hlcy.r, BigDay523, fun = mean)))
+aCIN <- c(aCIN, as.numeric(raster::extract(cin.r, BigDay523, fun = mean)))
+  
+BigDay523$aCAPE <- aCAPE
+BigDay523$aHLCY <- aHLCY
+BigDay523$aCIN <- aCIN
+```
+
+Get the maximum values: 
+```{r}
+mCAPE <- c()
+mCIN <- c()
+mHLCY <- c()
+
+mCAPE <- c(mCAPE, as.numeric(raster::extract(cape.r, BigDay523, fun = max)))
+mHLCY <- c(mHLCY, as.numeric(raster::extract(hlcy.r, BigDay523, fun = max)))
+mCIN <- c(mCIN, as.numeric(raster::extract(cin.r, BigDay523, fun = min)))
+
+BigDay523$mCAPE <- mCAPE
+BigDay523$mHLCY <- mHLCY
+BigDay523$mCIN <- mCIN
+```
+
+Plot the May 23, 2010 event with the CAPE values
+```{r}
+sts <- state.name[!state.name %in% c("Alaska", "Hawaii")]
+stateBorders <- us_states(states = sts)
+
+counties <- us_counties()
+counties.sf <- counties %>%
+  filter(!state_abbr %in% c("AK", "PR", "HI")) 
+
+tm_shape(cape.r) +
+  tm_raster(title = "CAPE (J/kg)", n = 5) +
+tm_shape(Hull523) +
+  tm_borders(col = "red", lwd = 3) +
+tm_shape(BigDay523) +
+  tm_symbols(size = .75, col = "black", shape = 24) +
+tm_shape(Torn523) +
+  tm_symbols(size = 1, col = "red") +
+tm_shape(stateBorders) + 
+  tm_borders(col = "gray15", alpha = 1) +
+  tm_compass(size = 5) +
+  tm_scale_bar(width = 0.5, size = 1.25, lwd = 2) +
+  tm_layout(legend.bg.color = "white", legend.text.size = .75) +
+tm_shape(counties.sf) +
+  tm_borders(col = "gray40", alpha = .3) +
+  tm_scale_bar(width = 8, size = 8) +
+  tm_format("World", legend.position = c("right", "bottom"),
+                   attr.position = c("left", "bottom"),
+                   legend.frame = FALSE,
+                   #title = "May 23rd Tornado Group",
+                   #title.size = 1.3,
+                   #title.position = c("left", "TOP"),
+                   inner.margins = c(.2, .2, .2, .2)) 
+```
+** This one looks ok **
+
+## May 30, 2003
+
+Extract the centroid, hull, and tornadoes for May 30 
+```{r}
+BigDay530 <- BigDays.sfdfT %>%
+  filter(cDate == "2003-05-30")
+
+Torn530 <- Torn.sfT %>%
+  filter(ID == "200305302976")
+
+Hull530 <- st_convex_hull(BigDay530)
+```
+
+Download the environmental data for the May 30, 2003 big day. Convert to a raster and transform the big day data to the same CRS as the environmental factors. 
+```{r}
+rb <- brick(paste0("/Volumes/My Passport for Mac/PhD_Program/NCARNARR/Files/18Z/", Hull530$slug))
+
+cape <- raster(rb, layer = 375)
+hlcy <- raster(rb, layer = 323)
+cin <- raster(rb, layer = 376)
+
+capeLL <- projectRaster(cape, crs = "+init=epsg:4326")
+cinLL <- projectRaster(cin, crs = "+init=epsg:4326")
+hlcyLL <- projectRaster(hlcy, crs = "+init=epsg:4326")
+
+sfdfTll <- st_transform(Hull530, crs = "+init=epsg:4326")
+r <- raster(extent(sfdfTll), resolution = res(capeLL))
+
+nT.r <- rasterize(sfdfTll, r, fun = 'first')
+
+cape.r <- projectRaster(capeLL, nT.r) 
+cin.r <- projectRaster(cinLL, nT.r)
+hlcy.r <- projectRaster(hlcyLL, nT.r)  
+```
+
+Get the average CAPE, CIN, and HLCY values:
+```{r}
+aCAPE <- c()
+aCIN <- c()
+aHLCY <- c()
+
+aCAPE <- c(aCAPE, as.numeric(raster::extract(capeLL, BigDay530, fun = mean)))
+aHLCY <- c(aHLCY, as.numeric(raster::extract(hlcyLL, BigDay530, fun = mean)))
+aCIN <- c(aCIN, as.numeric(raster::extract(cinLL, BigDay530, fun = mean)))
+  
+BigDay530$aCAPE <- aCAPE
+BigDay530$aHLCY <- aHLCY
+BigDay530$aCIN <- aCIN
+```
+
+Get the maximum values: 
+```{r}
+mCAPE <- c()
+mCIN <- c()
+mHLCY <- c()
+
+mCAPE <- c(mCAPE, as.numeric(raster::extract(cape.r, BigDay530, fun = max)))
+mHLCY <- c(mHLCY, as.numeric(raster::extract(hlcyLL, BigDay530, fun = max)))
+mCIN <- c(mCIN, as.numeric(raster::extract(cinLL, BigDay530, fun = min)))
+
+BigDay421$mCAPE <- mCAPE
+BigDay421$mHLCY <- mHLCY
+BigDay421$mCIN <- mCIN
+```
+
+Plot the May 30, 2003 event with the CAPE values
+```{r}
+sts <- state.name[!state.name %in% c("Alaska", "Hawaii")]
+stateBorders <- us_states(states = sts)
+
+counties <- us_counties()
+counties.sf <- counties %>%
+  filter(!state_abbr %in% c("AK", "PR", "HI")) 
+
+tm_shape(cape.r) +
+  tm_raster(title = "CAPE (J/kg)", n = 5) +
+tm_shape(Hull530) +
+  tm_borders(col = "red", lwd = 3) +
+tm_shape(BigDay530) +
+  tm_symbols(size = .75, col = "black", shape = 24) +
+tm_shape(Torn530) +
+  tm_symbols(size = 1, col = "red") +
+tm_shape(stateBorders) + 
+  tm_borders(col = "gray15", alpha = 1) +
+  tm_compass(size = 5) +
+  tm_scale_bar(width = 0.5, size = 1.25, lwd = 2) +
+  tm_layout(legend.bg.color = "white", legend.text.size = .75) +
+tm_shape(counties.sf) +
+  tm_borders(col = "gray40", alpha = .3) +
+  tm_scale_bar(width = 8, size = 8) +
+  tm_format("World", legend.position = c("right", "bottom"),
+                   attr.position = c("left", "bottom"),
+                   legend.frame = FALSE,
+                   #title = "May 30th Tornado Group",
+                   #title.size = 1.3,
+                   #title.position = c("left", "TOP"),
+                   inner.margins = c(.2, .2, .2, .2)) 
+```
+** ISSUE: Problem with the NARR file? **
 
 Try to predict ATE using our casualties. Pop density on the right side. 
 
