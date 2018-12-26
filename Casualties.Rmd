@@ -4,6 +4,7 @@ author: "Zoe Schroder/James Elsner"
 date: "11/18/2018"
 output: github_notebook
 editor_options: 
+  chunk_output_type: console
 chunk_output_type: console
 ---
 
@@ -510,6 +511,9 @@ BigDay421$aCAPE <- aCAPE
 BigDay421$aHLCY <- aHLCY
 BigDay421$aCIN <- aCIN
 ```
+aCAPE: 10.32
+aCIN: -13.55
+aHLCY: 369.82
 
 Get the maximum values: 
 ```{r}
@@ -525,6 +529,9 @@ BigDay421$mCAPE <- mCAPE
 BigDay421$mHLCY <- mHLCY
 BigDay421$mCIN <- mCIN
 ```
+mCAPE: 31.51
+mCIN: -29.6
+mHLCY: 384. 43
 
 Plot the April 21, 2001 event with the CAPE values
 ```{r}
@@ -610,6 +617,9 @@ BigDay523$aCAPE <- aCAPE
 BigDay523$aHLCY <- aHLCY
 BigDay523$aCIN <- aCIN
 ```
+aCAPE: 9.67
+aCIN: -22.92
+aHLCY: 135.88
 
 Get the maximum values: 
 ```{r}
@@ -625,6 +635,9 @@ BigDay523$mCAPE <- mCAPE
 BigDay523$mHLCY <- mHLCY
 BigDay523$mCIN <- mCIN
 ```
+mCAPE: 58.49
+mCIN: -57.72
+mHLCY: 187.12
 
 Plot the May 23, 2010 event with the CAPE values
 ```{r}
@@ -710,6 +723,9 @@ BigDay530$aCAPE <- aCAPE
 BigDay530$aHLCY <- aHLCY
 BigDay530$aCIN <- aCIN
 ```
+aCAPE: -0.07
+aCIN: 4.49
+aHLCY: 8836.37
 
 Get the maximum values: 
 ```{r}
@@ -725,6 +741,9 @@ BigDay421$mCAPE <- mCAPE
 BigDay421$mHLCY <- mHLCY
 BigDay421$mCIN <- mCIN
 ```
+mCAPE: 0.41
+mCIN: 3.55
+mHLCY: 14000
 
 Plot the May 30, 2003 event with the CAPE values
 ```{r}
