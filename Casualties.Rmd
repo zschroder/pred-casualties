@@ -162,11 +162,24 @@ BigDays.sfdfT <- Torn.sfT %>%
             GroupTotalEDinTW = paste(round(GroupTotalED/10^12), "TW"),
             maxEF = max(mag),
             nD = n_distinct(date),
-            StartTime = first(DateTime),
-            EndTime = last(DateTime),
-            Duration = difftime(EndTime, StartTime, units = "secs")) %>%
+            startTime = first(DateTime),
+            middleTime = median(DateTime),
+            finishTime = last(DateTime),
+            Duration = difftime(finishTime, startTime, units = "secs")) %>%
   filter(nT >= 10)
 dim(BigDays.sfdfT)
+```
+
+Convert `middleTime` to UTC.
+```{r}
+attr(BigDays.sfdfT$middleTime, "tzone") <- "UTC"
+head(BigDays.sfdfT$middleTime)
+```
+
+Round the UTC time to nearest 6 hours. This is done with the `align.time()` function from the **xts** package.
+```{r}
+library(xts)
+BigDays.sfdfT$NARRtime <- align.time(BigDays.sfdfT$middleTime, n = 60 * 60 * 3)
 ```
 
 Extract a vector of the big days. Save as a .csv for NARR download. 
@@ -237,7 +250,7 @@ Get the centroid (central point of the tornado activity) for each big day.
 ```{r}
 BigDayCentroids.sfdfT <- st_centroid(BigDays.sfdfT)
 BigDayCentroids.sfdfT$groupArea <- st_area(st_convex_hull(BigDays.sfdfT))
-BigDayCentroids.sfdfT$groupDensity <- BigDayCentroids.sfdfT$nT/BigDayCentroids.sfT$groupArea
+BigDayCentroids.sfdfT$groupDensity <- BigDayCentroids.sfdfT$nT/BigDayCentroids.sfdfT$groupArea
 ```
 
 Plot the centroids of all big days. Size by the number of casualties.
@@ -364,14 +377,42 @@ Spatial Extent:
 Longitude Range: Westernmost = 148.64E Easternmost = 2.568W
 Latitude Range: Southernmost = 0.897N Northernmost = 85.333N 
 
+```{r}
+BigDays.sfdfT <- st_transform(BigDays.sfdfT, 
+  crs = "+proj=lcc +lat_1=50 +lat_2=50 +lat_0=50 +lon_0=-107 +x_0=0 +y_0=0 +a=6371200 +b=6371200 +units=m +no_defs")
+```
+
+
+
 The list of all variables can be found here: http://www.emc.ncep.noaa.gov/mmb/rreanl/merged_land_AWIP32.pBigDays.sfdfT 
 
+Create a downloadable string of information  
+```{r}
+BigDays.sfdfT <- BigDays.sfdfT %>%
+  mutate(YrMoDa = gsub("-", "", NARRday),
+         ztime = 18,
+         slug = paste0("merged_AWIP32.",YrMoDa, ztime))
+slug <- BigDays.sfdfT$slug
+
+```
+
+Split the NARR date and time into their individual variables. Then bind the columns for BigDays.sfdfT. NOTE: cannot do a mutate because 00Z produces NAs. DON'T USE!
+```{r, eval = FALSE}
+NARRday = format(as.POSIXct(strptime(BigDays.sfdfT$NARRtime,"%Y-%m-%d %H:%M:%S",tz="")) ,format = "%Y/%m/%d")
+NARRZtime = format(as.POSIXct(strptime(BigDays.sfdfT$NARRtime,"%Y-%m-%d %H:%M:%S",tz="")) ,format = "%H")
+
+BigDays.sfdfT <- cbind(BigDays.sfdfT, NARRday, NARRZtime)
+```
+
+Create a downloadable string of information for the varying NARR times. DON'T USE
 ```{r, eval = FALSE}
 BigDays.sfdfT <- BigDays.sfdfT %>%
-  mutate(YrMoDa = gsub("-", "", cDate),
-         ztime = 18,
-         slug = paste0("merged_AWIP32.",YrMoDa, ztime)) 
+  mutate(YrMoDa = gsub("/", "", NARRday),
+         ztime = NARRZtime,
+         slug = paste0("merged_AWIP32.",YrMoDa, ztime),
+         slug2 = paste0("merged_AWIP32.",YrMoDa))
 slug <- BigDays.sfdfT$slug
+slug2 <- BigDays.sfdfT$slug2
 ```
 
 Read the grib files as raster bricks and assign the CAPE and helicity variables to separate raster layers. Extract the average (and extreme) environmental values within each of the big days in large groups hulls. 
@@ -394,7 +435,7 @@ library(raster)
 #i = 652 for example!
 for(i in 1:length(slug)){
   print(i)
-  rb <- brick(paste0("/Volumes/My Passport for Mac/PhD_Program/NCARNARR/Files/18Z/", BigDays.sfdfT$slug))
+  rb <- brick(paste0("/Volumes/My Passport for Mac/NCARNARR/All/", BigDays.sfdfT$slug2[i], "/",BigDays.sfdfT$slug[i]))
   CAPE.rl <- raster(rb, layer = 375)
   HLCY.rl <- raster(rb, layer = 323)
   CIN.rl <- raster(rb, layer = 376)
@@ -503,7 +544,7 @@ aCAPE <- c()
 aCIN <- c()
 aHLCY <- c()
 
-aCAPE <- c(aCAPE, as.numeric(raster::extract(cape.r, BigDay421, fun = mean)))
+aCAPE <- c(aCAPE, as.numeric(raster::extract(cape, BigDay421, fun = mean, method = 'bilinear')))
 aHLCY <- c(aHLCY, as.numeric(raster::extract(hlcy.r, BigDay421, fun = mean)))
 aCIN <- c(aCIN, as.numeric(raster::extract(cin.r, BigDay421, fun = mean)))
   
