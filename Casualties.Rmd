@@ -4,7 +4,7 @@ author: "Zoe Schroder/James Elsner"
 date: "11/18/2018"
 output: github_notebook
 editor_options: 
-  chunk_output_type: console
+  chunk_output_type: inline
 chunk_output_type: console
 ---
 
@@ -336,7 +336,7 @@ tm_shape(states.sf) +
   tm_borders(col = "black", alpha = 1) +
      tm_fill("col2",
             title = "Count",
-            breaks = c(0, 200, 400, 600, 800, 1000, 1200, 1400),
+            breaks = c(0, 100, 200, 300, 400, 500, 600, 800),
             style = "fixed", 
             palette = "Reds", n = 37) +
   tm_text("cascount") +
@@ -484,12 +484,104 @@ load("BigDays.RData")
 dim(BigDays.sfdfT)
 ```
 
+############
+## MODELS ##
+############
+
+```{r}
+library(lme4)
+m1 <- lmer(log(GroupTotalED) ~ I(Year - 2004) + (1|Month),
+             weights = nT, 
+             data = BigDays.sfdfT)
+summary(m1)
+
+m2 <- lmer(log(GroupTotalED) ~ I(Year - 2004) + (1|Month) + mCAPE2,
+             weights = nT, 
+             data = BigDays.sfdfT)
+summary(m2)
+
+m3 <- lmer(log(GroupTotalED) ~ I(Year - 2004) + (1|Month) + mBS2,
+             weights = nT, 
+             data = BigDays.sfdfT)
+summary(m3)
+
+m4 <- lmer(log(GroupTotalED) ~ I(Year - 2004) + (1|Month) + mHLCY2,
+             weights = nT, 
+             data = BigDays.sfdfT)
+summary(m4)
+
+m5 <- lmer(log(GroupTotalED) ~ I(Year - 2004) + (1|Month) + aHLCY2,
+             weights = nT, 
+             data = BigDays.sfdfT)
+summary(m5)
+
+m6 <- lmer(log(GroupTotalED) ~ I(Year - 2004) + (1|Month) + mCIN2,
+             weights = nT, 
+             data = BigDays.sfdfT)
+summary(m6)
+
+m6 <- lmer(log(GroupTotalED) ~ I(Year - 2004) + (1|Month) + mCAPE2 : mHLCY2,
+             weights = nT, 
+             data = BigDays.sfdfT)
+summary(m6)
+```
+
+```{r}
+model1 <- lmer(log(GroupTotalED) ~ (1|Month) + 
+                  mBS2 + mCAPE2*mHLCY2,
+             weights = nT, 
+             data = BigDays.sfdfT)
+summary(model1)
+
+model2 <- lmer(log(GroupTotalED) ~ (1|Month) + 
+                  mBS2 + mCAPE2 + mHLCY2,
+             weights = nT, 
+             data = BigDays.sfdfT)
+summary(model2)
+
+AIC(model1, model2)
+confint(model1, method = "Wald")
+```
+
+Table of coefficients.
+```{r}
+library(xtable)
+x <- summary(model1)
+xtable(x$coefficients, digits = 3)
+```
+
+Observed versus predicted.
+```{r}
+BigDays.sfdfT$preATE <- exp(predict(model1))
+cor(BigDays.sfdfT$preATE, BigDays.sfdfT$GroupTotalED)
+```
+
+Observed versus prediction plot for ATE.
+```{r}
+library(ggrepel)
+library(viridis)
+
+# .scresid : standardized conditional residuals
+model1.df <- fortify(model1)
+model1.df2 <- model1.df %>%
+  filter(abs(.scresid) >= 1.7)
+
+ggplot(model1.df, aes(x = GroupTotalED/10^9, y = preATE/10^9, color = log10(casualties + 1))) +
+        # geom_smooth(method = lm, color = "black", size = .4, se = FALSE) +
+#         scale_color_viridis_c(guide = FALSE, direction = -1) +
+         scale_color_continuous(guide = FALSE) +
+         geom_point(size = 5) + 
+         geom_abline(slope = 1, size = 1.25) +
+         #geom_label_repel(aes(x = GroupDayTotalED/10^9, y = preATE/10^9, label = as.character(cDate)), color = "black", data = model1.df2, size = 6) +
+         scale_x_log10(limits = c(1, 300000), breaks = c(1, 10, 100, 1000, 10000, 100000), labels = c(1, 10, "100", "1000", "10,000", "100,000")) +
+         scale_y_log10(limits = c(1, 300000), breaks = c(1, 10, 100, 1000, 10000, 100000), labels = c(1, 10, "100", "1000", "10,000", "100,000")) +
+  ylab("Predicted ATE [GW]") + xlab("ATE [GW]") +
+  theme_minimal() + theme(text = element_text(size=30))
+```
 
 Try to predict ATE using our casualties. Pop density on the right side. 
 
 ## Population Density
-
-
 
 ## SPC Outlooks
 
