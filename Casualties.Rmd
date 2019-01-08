@@ -375,6 +375,37 @@ ggplot(., aes(x = Year, y = avgATE)) +
     theme_minimal() 
 ```
 
+################
+## Data Check ##
+################
+
+Convert `middleTime` to UTC.
+```{r}
+attr(BigDays.sfdfT$startTime, "tzone") <- "UTC"
+attr(BigDays.sfdfT$finishTime, "tzone") <- "UTC"
+head(BigDays.sfdfT$startTime)
+```
+
+Split the NARR date and time into their individual variables. Then bind the columns for BigDays.sfdfT. NOTE: cannot do a mutate because 00Z produces NAs. DON'T USE!
+```{r, eval = FALSE}
+startday = format(as.POSIXct(strptime(BigDays.sfdfT$startTime,"%Y-%m-%d %H:%M:%S",tz="")) ,format = "%Y/%m/%d")
+starthour = format(as.POSIXct(strptime(BigDays.sfdfT$startTime,"%Y-%m-%d %H:%M:%S",tz="")) ,format = "%H")
+
+endday = format(as.POSIXct(strptime(BigDays.sfdfT$finishTime,"%Y-%m-%d %H:%M:%S",tz="")) ,format = "%Y/%m/%d")
+endhour = format(as.POSIXct(strptime(BigDays.sfdfT$finishTime,"%Y-%m-%d %H:%M:%S",tz="")) ,format = "%H")
+
+NARRday = format(as.POSIXct(strptime(BigDays.sfdfT$NARRtime,"%Y-%m-%d %H:%M:%S",tz="")) ,format = "%Y/%m/%d")
+NARRZtime = format(as.POSIXct(strptime(BigDays.sfdfT$NARRtime,"%Y-%m-%d %H:%M:%S",tz="")) ,format = "%H")
+
+BigDays.sfdfT <- cbind(BigDays.sfdfT, startday, starthour, endday, endhour, NARRday, NARRZtime )
+```
+
+```{r}
+BigDays.sfdfT %>%
+  group_by(NARRZtime) %>%
+  summarize(count = n())
+```
+
 ## NARR data: 
 Data is downloaded from NCAR's North American Regional Reanalysis (https://rda.ucar.edu/datasets/ds608.0/#!access). It extends from 1-1-1979 to 11-1-2018. Use the NCAR NARR 3-hourly files.  
 
@@ -570,13 +601,13 @@ ggplot(model1.df, aes(x = GroupTotalED/10^9, y = preATE/10^9, color = log10(casu
         # geom_smooth(method = lm, color = "black", size = .4, se = FALSE) +
 #         scale_color_viridis_c(guide = FALSE, direction = -1) +
          scale_color_continuous(guide = FALSE) +
-         geom_point(size = 5) + 
-         geom_abline(slope = 1, size = 1.25) +
+         geom_point(size = 2) + 
+         geom_abline(slope = 1, size = 1) +
          #geom_label_repel(aes(x = GroupDayTotalED/10^9, y = preATE/10^9, label = as.character(cDate)), color = "black", data = model1.df2, size = 6) +
          scale_x_log10(limits = c(1, 300000), breaks = c(1, 10, 100, 1000, 10000, 100000), labels = c(1, 10, "100", "1000", "10,000", "100,000")) +
          scale_y_log10(limits = c(1, 300000), breaks = c(1, 10, 100, 1000, 10000, 100000), labels = c(1, 10, "100", "1000", "10,000", "100,000")) +
   ylab("Predicted ATE [GW]") + xlab("ATE [GW]") +
-  theme_minimal() + theme(text = element_text(size=30))
+  theme_minimal() + theme(text = element_text(size=15))
 ```
 
 Try to predict ATE using our casualties. Pop density on the right side. 
