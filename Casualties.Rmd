@@ -660,6 +660,56 @@ Try to predict ATE using our casualties. Pop density on the right side.
 
 You need to establish a population density for each big day. Round the year to the nearest 10. Example: 1995 should round to 2000 census and 1993 should round to 1990 census. 
 
+Create a function to round to the nearest 5 since we can get population for every 5 years starting 1995 - 2015. 
+```{r}
+mround <- function(x,base){ 
+        base*round(x/base) 
+} 
+```
+
+Add a new column `roundyear` to the dataset. This will round each year to the nearest 5th year. 
+```{r}
+BigDays.sfdfT <- BigDays.sfdfT %>%
+  mutate(roundyear = mround(Year, 5))
+```
+
+```{r}
+avgPopDens <- numeric()
+maxPopDens <- numeric()
+
+library(raster)
+for(i in 1:dim(BigDays.sfdfT)[1]){
+  print(i)
+  if (BigDays.sfdfT$roundyear[i] == 1995) {
+  rb <- raster("/Users/zoeschroder/Desktop/Projects/Pred-casualties/PopDens/usadens/usads95g/w001001.adf")
+  ext = raster::extent(c(-125, -67, 24, 50))
+  PopDens = crop(rb, ext)
+  PopDens.rl = projectRaster(PopDens, crs = "+proj=lcc +lat_1=50 +lat_2=50 +lat_0=50 +lon_0=-107 +x_0=0 +y_0=0 +a=6371200 +b=6371200 +units=m +no_defs")
+  avgPopDens <- c(avgPopDens, as.numeric(raster::extract(PopDens.rl, BigDays.sfdfT[i, ], fun = mean)))
+  maxPopDens <- c(maxPopDens, as.numeric(raster::extract(PopDens.rl, BigDays.sfdfT[i, ], fun = max))) 
+  } else {
+  rb <- raster(paste0("/Users/zoeschroder/Desktop/Projects/Pred-casualties/PopDens", "/gpw-v4-population-density-rev10_", BigDays.sfdfT$roundyear[i], "_30_sec_tif/gpw_v4_population_density_rev10_", BigDays.sfdfT$roundyear[i], "_30_sec.tif"))
+  ext = raster::extent(c(-125, -67, 24, 50))
+  PopDens = crop(rb, ext)
+  PopDens.rl = projectRaster(PopDens, crs = "+proj=lcc +lat_1=50 +lat_2=50 +lat_0=50 +lon_0=-107 +x_0=0 +y_0=0 +a=6371200 +b=6371200 +units=m +no_defs")
+  avgPopDens <- c(avgPopDens, as.numeric(raster::extract(PopDens.rl, BigDays.sfdfT[i,], fun = mean, na.rm = TRUE, weights = TRUE, normalizeWeights = FALSE)))
+  maxPopDens <- c(maxPopDens, as.numeric(raster::extract(PopDens.rl, BigDays.sfdfT[i,], fun = max, na.rm = TRUE, weights = TRUE, normalizeWeights = FALSE)))
+  }
+}
+```
+ 
+Begin with The Gridded Population of the World Volume 3 data. This data set has population density data available beginning in 1990 and ending in 2000. 
+```{r}
+#TornLs = subset(TornL, date == "2011-04-27")
+TornP = gBuffer(BigDays.sfdfT[i,])
+Pop = raster("/Users/tylerfricker/Dropbox/Tyler/usadens/usads00g/w001001.adf")
+Popp = projectRaster(PopDens, crs = proj4string(TornP))
+TornP$popD = as.vector(raster::extract(Popp, TornP, fun = mean, na.rm = TRUE,
+                                       weights = FALSE, normalizeWeights = FALSE))
+TornP$pop = TornP$popD * TornP$AreaPath/10^6
+Torn.df = as.data.frame(TornP)
+```
+
 Population data are obtained from the Gridded Population of the World, version four (GPW, v4) from the Socioeconomic Data and Applications Center at Columbia University, USA. The database contain decennial census density estimates for 1990, 2000, and 2010 represented as people per square kilometer. Densities are based on residential population. The native cell resolution is .0083$^{\circ}$ latitude/longitude, which at 36$^{\circ}$ N latitude means a cell having the dimension of .9 km in the north-south direction and .7 km in the east-west direction. 
 
 Load the population raster(s) and crop to defined extent. Use the `extract` function to obtain the population density. The `projectRaster` and `extract` functions take about 10 minutes per raster. Group years by mid-year of the census year. Assign the population density using the first decennial estimate then successively replace with later estimates by grouped years.
