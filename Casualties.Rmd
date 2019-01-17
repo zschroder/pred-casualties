@@ -687,6 +687,19 @@ Torn.df = as.data.frame(TornP)
 proc.time() - stime
 ```
 
+Begin with The Gridded Population of the World Volume 3 data (2000).
+```{r}
+#TornLs = subset(TornL, date == "2011-04-27")
+TornP = gBuffer(TornL, byid = TRUE, width = TornL$Width/2, capStyle = "FLAT")
+Pop = raster("/Users/tylerfricker/Dropbox/Tyler/usadens/usads00g/w001001.adf")
+Popp = projectRaster(Pop, crs = proj4string(TornP))
+TornP$popD = as.vector(raster::extract(Popp, TornP, fun = mean, na.rm = TRUE,
+                                       weights = FALSE, normalizeWeights = FALSE))
+TornP$pop = TornP$popD * TornP$AreaPath/10^6
+Torn.df = as.data.frame(TornP)
+```
+
+
 Note: The warning results from tornadoes with paths over areas with no people. It can be safely ignored.
 
 The `popD` attribute for each tornado corresponds to the population density from the nearest decennial estimate so that a tornado that occurred in 1996 uses the 2000 decennial estimate while a tornado that occurred in 2012 uses the 2010 estimate.
