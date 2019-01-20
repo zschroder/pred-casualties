@@ -27,14 +27,14 @@ suppressMessages(library(xts))
 ##########################
 
 Download the tornado data from the Storm Prediction Center (SPC) http://www.spc.noaa.gov/gis/svrgis/. This database includes all tornadoes from 1950 to 2016 in a shapefile. A description of all column headings and units can be found here: http://www.spc.noaa.gov/wcm/data/SPC_severe_database_description.pdf 
-```{r}
+```{r, eval = FALSE}
 download.file(url = "http://www.spc.noaa.gov/gis/svrgis/zipped/1950-2017-torn-initpoint.zip",
               destfile = "tornado.zip", mode = "wb")
 unzip("tornado.zip")
 ```
 
 Load the shapefile into R using the `read_sf` function from the **sf** package. Set `stringsAsFactors` to **FALSE** so that the character vectors are not converted to factors. 
-```{r}
+```{r, eval = FALSE}
 Torn.sf <- read_sf(dsn = "1950-2017-torn-initpoint", 
                    layer = "1950-2017-torn-initpoint", 
                    stringsAsFactors = FALSE)
@@ -42,7 +42,7 @@ Torn.sf <- read_sf(dsn = "1950-2017-torn-initpoint",
 Torn.sf is a 62519 x 22 data frame.
 
 Remove tornadoes in Hawaii, Alaska, and Puerto Rico and those occurring before 1994. That year marks the beginning of the comprehensive WSR-88D radar. For missing EF ratings use the modification rules (if/else) defined here: https://www.spc.noaa.gov/wcm/OneTor_F-scale-modifications.pdf. **NOTE: All tornadoes with an EF rating of -9 have a property loss of 0. (These are all 2016 and 2017 tornadoes.) Therefore, you do not need that column to assign a magnitude. **
-```{r}
+```{r, eval = FALSE}
 Torn.sf <- Torn.sf %>%
   filter(yr >= 1994,
          !st %in% c("AK", "PR", "HI")) %>%
@@ -51,7 +51,7 @@ Torn.sf <- Torn.sf %>%
 ```
 
 Add a date/time column also add columns for path length, width, and area in metric units. Leave the time zone as native CDT. Create a convective day (6AM to 6AM) column taking hours 00:00:00 -> 05:59:59 and assigning it to the previous date (this associates the previous day's date to tornadoes occurring up to 6 hours after local midnight). The length needs to be converted to meters from miles and 0 lengths need to be assigned a value. The width of the tornado tracks need to be changed to meters from yard and 0 widths need to be assigned a value. Add a casualties column (injuries and fatalities). Calculate the area of the tornado path. Create a column with the name of the months. 
-```{r}
+```{r, eval = FALSE}
 Torn.sf <- Torn.sf %>%
   mutate(dy = format(as.Date(date,format="%Y-%m-%d"), "%d"),
          DateTime = as.POSIXct(paste(yr, mo, dy, time), format = "%Y%m%d%H:%M:%S"),
@@ -80,7 +80,7 @@ $$
 where $A_p$ is the area of the path, $\rho$ is area density [1 kg/m^3]  $v_j$ is the midpoint wind speed for each rating, and $w_j$ is the corresponding fraction of path area by EF rating. With no upper bound on the EF5 wind speeds, the midpoint wind speed is set at 97 m~s$^{-1}$ (7.5 m~s$^{-1}$ above the threshold wind speed consistent with the EF4 midpoint speed relative to its threshold)
 
 Add the energy dissipation per tornado. 
-```{r}
+```{r, eval = FALSE}
 perc <- c(1, 0, 0, 0, 0, 0, 
           .772, .228, 0, 0, 0, 0,
           .616, .268, .115, 0, 0, 0,
@@ -98,7 +98,7 @@ Torn.sf <- Torn.sf %>%
 ```
 
 Determine the distance between tornadoes in space and time. Use a projection, not lat/lon. See https://epsg.io/102004. Extract the coordinates of the start locations as a N by 2 matrix, where N is the number of tornadoes. Also extract the date-time as a vector of class `POSIXct`.
-```{r}
+```{r, eval = FALSE}
 Torn.sfT <- st_transform(Torn.sf, crs = 102004)
 space <- st_coordinates(Torn.sfT)
 time <- Torn.sf$DateTime
@@ -107,7 +107,7 @@ time <- Torn.sf$DateTime
 Next compute pairwise Euclidean distances in space and, separately, in time using the `dist()` function. Divide the spatial distance by 10 so that the values are commensurate with the time 'distance' based on the assumption of 10 meters every second for an average speed of tornado-generating storms. 
 
 Compare: Distance from New York to Denver is 2.622 x 10^6 meters. There are 3.154 x 10^7 seconds in a year. This will capture the historic multiday tornado outbreaks. For analysis we want to consider each day in the multiday group separately. As the value of the divisor increases cluster areas get larger. Remove `ds` and `dt` to free memory.
-```{r}
+```{r, eval = FALSE}
 ds <- dist(space) / 10
 dt <- dist(time)
 dst <- ds + dt
@@ -121,7 +121,7 @@ Next group the tornadoes based on the space-time distances. This is done with th
 The single linkage method (`method = "single"`) is related to the minimal spanning tree (MST) and adopts a 'friends of friends' grouping strategy. An edge-weighted graph is a graph where each edge has a weight (or cost). Here weights are space-time distances between tornadoes. A MST of an edge-weighted graph is a spanning tree whose weight (the sum of the weights of its edges) is no larger than the weight of any other spanning tree. A spanning tree of a graph on N vertices (tornado centroids) is a subset of N-1 edges that form a tree (Skiena 1990, p. 227).
  
 The `cutree()` function is used to extract a group number for each tornado. Tornadoes in each group are close in space & time. Here the tree is cut at a height of 50000 space-time units. Making `h` smaller results in smaller groups (fewer tornadoes per group).
-```{r}
+```{r, eval = FALSE}
 stime <- proc.time()
 tree <- hclust(dst, method = "single")
 groupNumber <- as.integer(cutree(tree, h = 50000))
@@ -129,28 +129,22 @@ proc.time() - stime
 ```
 
 Add the group number to each tornado. 
-```{r}
+```{r, eval = FALSE}
 Torn.sfT$groupNumber <- groupNumber
 ```
 
 Create an ID for unique big days. It needs to have the group number and the cDate because there are multiple group numbers in each cDate. Similarly, there are multiple cDates in each groupnumber. An ID helps retrieve appropriate/unique big days. 
-```{r}
+```{r, eval = FALSE}
 Torn.sfT <- Torn.sfT %>%
    mutate(ID = paste0(gsub("-", "", cDate), groupNumber))
 ```
 
 Compute big day-level statistics. Keep only days with at least 10 tornadoes. 
-```{r}
+```{r, eval = FALSE}
 BigDays.sfdfT <- Torn.sfT %>%
   group_by(ID, groupNumber, cDate) %>%
   summarize(Year = first(Year),
             Month = first(mo),
-            FirstDate = first(date),
-            LastDate = last(date),
-            DateRange = paste(FirstDate, "to", LastDate),
-            FirstcDate = first(cDate),
-            LastcDate = last(cDate),
-            ncD = n_distinct(cDate),
             casualties = sum(cas),
             nT = n(),
             nT1_5 = sum(mag >= 1),
@@ -163,7 +157,6 @@ BigDays.sfdfT <- Torn.sfT %>%
             GroupTotalED = sum(ED),
             GroupTotalEDinTW = paste(round(GroupTotalED/10^12), "TW"),
             maxEF = max(mag),
-            nD = n_distinct(date),
             startTime = first(DateTime),
             middleTime = median(DateTime),
             finishTime = last(DateTime),
@@ -173,14 +166,14 @@ dim(BigDays.sfdfT)
 ```
 
 Convert `middleTime` to UTC.
-```{r}
+```{r, eval = FALSE}
 attr(BigDays.sfdfT$startTime, "tzone") <- "UTC"
 attr(BigDays.sfdfT$middleTime, "tzone") <- "UTC"
 attr(BigDays.sfdfT$finishTime, "tzone") <- "UTC"
 ```
 
 Round the UTC time to nearest 6 hours. This is done with the `align.time()` function from the **xts** package. Adjust it by 3 hours to get the closest time. This falls within the outbreak so you need to subtract by 3 hours (10800 seconds). This will produce the closest 3 hour NARR time that occurs before and not within the big day. 
-```{r}
+```{r, eval = FALSE}
 BigDays.sfdfT$NARRtime <- (align.time(BigDays.sfdfT$startTime, n = (60 * 60 * 3)) - 3600 * 3)
 ```
 
@@ -190,40 +183,39 @@ Split the NARR date and time into their individual variables. Then bind the colu
 NARRday = format(as.POSIXct(strptime(BigDays.sfdfT$NARRtime,"%Y-%m-%d %H:%M:%S",tz="")) ,format = "%Y/%m/%d")
 NARRZtime = format(as.POSIXct(strptime(BigDays.sfdfT$NARRtime,"%Y-%m-%d %H:%M:%S",tz="")) ,format = "%H")
 
-BigDays.sfdfT <- cbind(BigDays.sfdfT, NARRday, NARRZtime )
+BigDays.sfdfT <- cbind(BigDays.sfdfT, NARRday, NARRZtime)
 ```
 
 Create a table to show how many big days fall in each start Z time. 
-```{r}
+```{r, eval = FALSE}
 BigDays.sfdfT %>%
   group_by(NARRZtime) %>%
   summarize(count = n())
 ```
 
 Create a downloadable string of information for the varying NARR times. DON'T USE
-```{r}
+```{r, eval = FALSE}
 BigDays.sfdfT <- BigDays.sfdfT %>%
   mutate(YrMoDa = gsub("/", "", NARRday),
-         ztime = NARRZtime,
-         slug = paste0("merged_AWIP32.",YrMoDa, ztime),
+         slug = paste0("merged_AWIP32.",YrMoDa, NARRZtime),
          slug2 = paste0("merged_AWIP32.",YrMoDa))
 ```
 
 Extract a vector of the big days. Save as a .csv for NARR download. 
-```{r}
+```{r, eval = FALSE}
 bigdays <- BigDays.sfdfT$NARRday
 bigdaytimes <- BigDays.sfdfT$NARRZtime
 x <- cbind(as.character(bigdays), as.character(bigdaytimes))
 write.csv(x, "BigDays.csv")
 ```
 
-```{r}
+```{r, eval = FALSE}
 BigDays.sfdfT <- st_transform(BigDays.sfdfT, 
   crs = "+proj=lcc +lat_1=50 +lat_2=50 +lat_0=50 +lon_0=-107 +x_0=0 +y_0=0 +a=6371200 +b=6371200 +units=m +no_defs")
 ```
 
 Obtain the group day hulls. Transform the CRS to match that of the environmental data raster grids.
-```{r}
+```{r, eval = FALSE}
 BigDays.sfdfT <- st_convex_hull(BigDays.sfdfT)
 BigDays.sfdfT$HullArea <- st_area(BigDays.sfdfT)
 BigDays.sfdfT <- st_transform(BigDays.sfdfT, 
@@ -231,14 +223,14 @@ BigDays.sfdfT <- st_transform(BigDays.sfdfT,
 ```
 
 Get the centroid (central point of the tornado activity) for each big day. 
-```{r}
+```{r, eval = FALSE}
 BigDayCentroids.sfdfT <- st_centroid(BigDays.sfdfT)
 BigDayCentroids.sfdfT$groupArea <- st_area(st_convex_hull(BigDays.sfdfT))
 BigDayCentroids.sfdfT$groupDensity <- BigDayCentroids.sfdfT$nT/BigDayCentroids.sfdfT$groupArea
 ```
 
 Save the Big Days to a file `BigDays.RData`.
-```{r}
+```{r, eval = FALSE}
 #save(BigDays.sfdfT, file = "BigDays.RData")
 load("BigDays.RData")
 dim(BigDays.sfdfT)
@@ -252,7 +244,7 @@ Torn.sfT <- Torn.sfT %>%
 ```
 
 Save the Tornadoes to a file `BigDayTornadoes.RData`.
-```{r}
+```{r, eval = FALSE}
 #save(Torn.sfT, file = "BigDayTornadoes.RData")
 load("BigDayTornadoes.RData")
 dim(Torn.sfT)
@@ -263,7 +255,7 @@ dim(Torn.sfT)
 #######################
 
 Set the state and county borders. Remove Alaska, Hawaii, and Puerto Rico. 
-```{r}
+```{r, eval = FALSE}
 sts <- state.name[!state.name %in% c("Alaska", "Hawaii")]
 stateBorders <- us_states(states = sts)
 
@@ -276,7 +268,7 @@ counties.sf <- counties %>%
 ```
 
 Plot the hulls for each big day on a map. 
-```{r}
+```{r, eval = FALSE}
 tm_shape(BigDays.sfdfT) +
   tm_polygons(alpha = .1) + 
 tm_shape(stateBorders, projection = "laea_NA", is.master = TRUE) + 
@@ -284,7 +276,7 @@ tm_shape(stateBorders, projection = "laea_NA", is.master = TRUE) +
 ```
 
 Plot the centroids of all big days. Size by the number of casualties.
-```{r}
+```{r, eval = FALSE}
 counties.sf <- st_transform(counties.sf, 
                             crs = st_crs(stateBorders))
 BigDays.sfdfT <- st_transform(BigDays.sfdfT, 
@@ -326,7 +318,7 @@ casualty[30:40, ]
 ```
 
 Manipulate the data to add casualty count by state to the `us_states()` data frame from the **USAboundaries** package. 
-```{r}
+```{r, eval = FALSE}
 missstates <- c("AZ", "CA", "ID", "NV", "OR", "RI", "UT", "WA", "DC")
 misscas <- as.integer(rep(0, 13))
 
@@ -372,7 +364,7 @@ tm_shape(states.sf) +
 ```
 
 Time Series of casualty counts.
-```{r}
+```{r, eval = FALSE}
 Torn.sfT %>%
   group_by(Year) %>%
   summarize(cas = n()) %>%
@@ -389,7 +381,7 @@ ggplot(., aes(x = Year, y = cas)) +
 ```
 
 Plot the relationship between GroupDayTotalED (ATE) by Year. Size the dots by casualties. 
-```{r}
+```{r, eval = FALSE}
 BigDays.sfdfT %>%
   group_by(Year) %>%
   summarize(casualties = sum(casualties),
@@ -413,34 +405,34 @@ Spatial Extent:
 Longitude Range: Westernmost = 148.64E Easternmost = 2.568W
 Latitude Range: Southernmost = 0.897N Northernmost = 85.333N 
 
-```{r}
+```{r, eval = FALSE}
 BigDays.sfdfT <- st_transform(BigDays.sfdfT, 
   crs = "+proj=lcc +lat_1=50 +lat_2=50 +lat_0=50 +lon_0=-107 +x_0=0 +y_0=0 +a=6371200 +b=6371200 +units=m +no_defs")
 ```
 
 The list of all variables can be found here: http://www.emc.ncep.noaa.gov/mmb/rreanl/merged_land_AWIP32.pBigDays.sfdfT 
 
-```{r}
+```{r, eval = FALSE}
 slug <- BigDays.sfdfT$slug
 slug2 <- BigDays.sfdfT$slug2
 ```
 
 
 Read the grib files as raster bricks and assign the CAPE and helicity variables to separate raster layers. Extract the average (and extreme) environmental values within each of the big days in large groups hulls. 
-```{r}
-aCAPE <- numeric()
-aHLCY <- numeric()
-aCIN <- numeric()
-aUSTM <- numeric()
-aVSTM <- numeric()
-aBS <- numeric()
-aRATIO <- numeric()
-mCAPE <- numeric()
-mHLCY <- numeric()
-mCIN <- numeric()
-mUSTM <- numeric()
-mVSTM <- numeric()
-mBS <- numeric()
+```{r, eval = FALSE}
+avgCAPE <- numeric()
+avgHLCY <- numeric()
+avgCIN <- numeric()
+avgUSTM <- numeric()
+avgVSTM <- numeric()
+avgBS <- numeric()
+avgRATIO <- numeric()
+maxCAPE <- numeric()
+maxHLCY <- numeric()
+minCIN <- numeric()
+maxUSTM <- numeric()
+maxVSTM <- numeric()
+maxBS <- numeric()
  
 library(raster)
 for(i in 1:length(slug)){
@@ -454,62 +446,157 @@ for(i in 1:length(slug)){
   VSTM.rl <- raster(rb, layer = 325)
   BS.rl <- sqrt(USTM.rl^2 + VSTM.rl^2)
   RATIO.rl <- CAPE.rl/abs(CIN.rl)
-  aCAPE <- c(aCAPE, as.numeric(raster::extract(CAPE.rl, BigDays.sfdfT[i, ], fun = mean)))
-  aHLCY <- c(aHLCY, as.numeric(raster::extract(HLCY.rl, BigDays.sfdfT[i, ], fun = mean)))
-  aCIN <- c(aCIN, as.numeric(raster::extract(CIN.rl, BigDays.sfdfT[i, ], fun = mean)))
-  aUSTM <- c(aUSTM, as.numeric(raster::extract(USTM.rl, BigDays.sfdfT[i, ], fun = mean)))
-  aVSTM <- c(aVSTM, as.numeric(raster::extract(VSTM.rl, BigDays.sfdfT[i, ], fun = mean)))
-  aBS <- c(aBS, as.numeric(raster::extract(BS.rl, BigDays.sfdfT[i, ], fun = mean)))
-  aRATIO <- c(aRATIO, as.numeric(raster::extract(RATIO.rl, BigDays.sfdfT[i, ], fun = mean)))
-  mCAPE <- c(mCAPE, as.numeric(raster::extract(CAPE.rl, BigDays.sfdfT[i, ], fun = max)))
-  mHLCY <- c(mHLCY, as.numeric(raster::extract(HLCY.rl, BigDays.sfdfT[i, ], fun = max)))
-  mCIN <- c(mCIN, as.numeric(raster::extract(CIN.rl, BigDays.sfdfT[i, ], fun = min)))
-  mUSTM <- c(mUSTM, as.numeric(raster::extract(USTM.rl, BigDays.sfdfT[i, ], fun = max)))
-  mVSTM <- c(mVSTM, as.numeric(raster::extract(VSTM.rl, BigDays.sfdfT[i, ], fun = max)))
-  mBS <- c(mBS, as.numeric(raster::extract(BS.rl, BigDays.sfdfT[i, ], fun = max)))
+  avgCAPE <- c(avgCAPE, as.numeric(raster::extract(CAPE.rl, BigDays.sfdfT[i, ], fun = mean)))
+  avgHLCY <- c(avgHLCY, as.numeric(raster::extract(HLCY.rl, BigDays.sfdfT[i, ], fun = mean)))
+  avgCIN <- c(avgCIN, as.numeric(raster::extract(CIN.rl, BigDays.sfdfT[i, ], fun = mean)))
+  avgUSTM <- c(avgUSTM, as.numeric(raster::extract(USTM.rl, BigDays.sfdfT[i, ], fun = mean)))
+  avgVSTM <- c(avgVSTM, as.numeric(raster::extract(VSTM.rl, BigDays.sfdfT[i, ], fun = mean)))
+  avgBS <- c(avgBS, as.numeric(raster::extract(BS.rl, BigDays.sfdfT[i, ], fun = mean)))
+  avgRATIO <- c(avgRATIO, as.numeric(raster::extract(RATIO.rl, BigDays.sfdfT[i, ], fun = mean)))
+  maxCAPE <- c(maxCAPE, as.numeric(raster::extract(CAPE.rl, BigDays.sfdfT[i, ], fun = max)))
+  maxHLCY <- c(maxHLCY, as.numeric(raster::extract(HLCY.rl, BigDays.sfdfT[i, ], fun = max)))
+  minCIN <- c(minCIN, as.numeric(raster::extract(CIN.rl, BigDays.sfdfT[i, ], fun = min)))
+  maxUSTM <- c(maxUSTM, as.numeric(raster::extract(USTM.rl, BigDays.sfdfT[i, ], fun = max)))
+  maxVSTM <- c(maxVSTM, as.numeric(raster::extract(VSTM.rl, BigDays.sfdfT[i, ], fun = max)))
+  maxBS <- c(maxBS, as.numeric(raster::extract(BS.rl, BigDays.sfdfT[i, ], fun = max)))
 }
 ```
 
 Add environmental data values to the group day means data frame.
 ```{r, eval = FALSE}
-BigDays.sfdfT$aCAPE <- aCAPE
-BigDays.sfdfT$aHLCY <- aHLCY
-BigDays.sfdfT$aCIN <- aCIN
-BigDays.sfdfT$mCAPE <- mCAPE
-BigDays.sfdfT$mHLCY <- mHLCY
-BigDays.sfdfT$mCIN <- mCIN
-BigDays.sfdfT$mUSTM <- mUSTM
-BigDays.sfdfT$mVSTM <- mVSTM
-BigDays.sfdfT$aUSTM <- aUSTM
-BigDays.sfdfT$aVSTM <- aVSTM
-BigDays.sfdfT$aBS <- aBS
-BigDays.sfdfT$aRATIO <- aRATIO
-BigDays.sfdfT$mBS <- mBS
+BigDays.sfdfT$avgCAPE <- avgCAPE
+BigDays.sfdfT$avgHLCY <- avgHLCY
+BigDays.sfdfT$avgCIN <- avgCIN
+BigDays.sfdfT$avgUSTM <- avgUSTM
+BigDays.sfdfT$avgVSTM <- avgVSTM
+BigDays.sfdfT$avgBS <- avgBS
+BigDays.sfdfT$avgRATIO <- avgRATIO
+BigDays.sfdfT$maxCAPE <- maxCAPE
+BigDays.sfdfT$maxHLCY <- maxHLCY
+BigDays.sfdfT$minCIN <- minCIN
+BigDays.sfdfT$maxUSTM <- maxUSTM
+BigDays.sfdfT$maxVSTM <- maxVSTM
+BigDays.sfdfT$maxBS <- maxBS
 ```
 
 Scale the variables to make them easier to read and input for models. 
 ```{r, eval = FALSE}
-BigDays.sfdfT$aCAPE2 <- BigDays.sfdfT$aCAPE/1000
-BigDays.sfdfT$aHLCY2 <- BigDays.sfdfT$aHLCY/100
-BigDays.sfdfT$aCIN2 <- BigDays.sfdfT$aCIN/100
-BigDays.sfdfT$aBS2 <- BigDays.sfdfT$aBS/10
-BigDays.sfdfT$aUSTM2 <- BigDays.sfdfT$aUSTM/10
-BigDays.sfdfT$aVSTM2 <- BigDays.sfdfT$aVSTM/10
+BigDays.sfdfT$avgCAPE2 <- BigDays.sfdfT$avgCAPE/1000
+BigDays.sfdfT$avgHLCY2 <- BigDays.sfdfT$avgHLCY/100
+BigDays.sfdfT$avgCIN2 <- BigDays.sfdfT$avgCIN/100
+BigDays.sfdfT$avgBS2 <- BigDays.sfdfT$avgBS/10
+BigDays.sfdfT$avgUSTM2 <- BigDays.sfdfT$avgUSTM/10
+BigDays.sfdfT$avgVSTM2 <- BigDays.sfdfT$avgVSTM/10
 
-BigDays.sfdfT$mCAPE2 <- BigDays.sfdfT$mCAPE/1000
-BigDays.sfdfT$mHLCY2 <- BigDays.sfdfT$mHLCY/100
-BigDays.sfdfT$mCIN2 <- BigDays.sfdfT$mCIN/100
-BigDays.sfdfT$mBS2 <- BigDays.sfdfT$mBS/10
-BigDays.sfdfT$mUSTM2 <- BigDays.sfdfT$mUSTM/10
-BigDays.sfdfT$mVSTM2 <- BigDays.sfdfT$mVSTM/10
+BigDays.sfdfT$maxCAPE2 <- BigDays.sfdfT$maxCAPE/1000
+BigDays.sfdfT$maxHLCY2 <- BigDays.sfdfT$maxHLCY/100
+BigDays.sfdfT$minCIN2 <- BigDays.sfdfT$minCIN/100
+BigDays.sfdfT$maxBS2 <- BigDays.sfdfT$maxBS/10
+BigDays.sfdfT$maxUSTM2 <- BigDays.sfdfT$maxUSTM/10
+BigDays.sfdfT$maxVSTM2 <- BigDays.sfdfT$maxVSTM/10
+```
+
+########################
+## Population Density ##
+########################
+
+You need to establish a population density for each big day. Round the year to the nearest 10. Example: 1995 should round to 2000 census and 1993 should round to 1990 census. 
+
+Create a function to round to the nearest 5 since we can get population for every 5 years starting 1995 - 2015. 
+```{r, eval = FALSE}
+mround <- function(x,base){ 
+        base*round(x/base) 
+} 
+```
+
+Add a new column `PopDensyear` to the dataset. This will round each year to the nearest 5th year. 
+```{r, eval = FALSE}
+BigDays.sfdfT <- BigDays.sfdfT %>%
+  mutate(PopDensyear = mround(Year, 5))
+```
+
+Download the census data: 
+
+Begin with The Gridded Population of the World Volume 3 data (2000). Begin with The Gridded Population of the World Volume 3 data. This data set has population density data available beginning in 1990 and ending in 2000. We are using the 1995 data. 
+
+Population Data for 2000 through 2015 are obtained from the Gridded Population of the World, version four (GPW, v4) from the Socioeconomic Data and Applications Center at Columbia University, USA. The database contain decennial census density estimates for 2000, 2005, 2010, and 2015 represented as people per square kilometer. Densities are based on residential population. 
+
+Load the population raster(s) and crop to defined extent. 
+```{r, eval = FALSE}
+#1995 Data: 
+  rb <- raster("/Users/zoeschroder/Desktop/Projects/Pred-casualties/PopDens/usadens/usads95g/w001001.adf")
+  ext = raster::extent(c(-125, -67, 24, 50))
+  PopDens = crop(rb, ext)
+  PopDens1995 = projectRaster(PopDens, crs = "+proj=lcc +lat_1=50 +lat_2=50 +lat_0=50 +lon_0=-107 +x_0=0 +y_0=0 +a=6371200 +b=6371200 +units=m +no_defs")
+#2000 Data: 
+  rb <- raster(paste0("/Users/zoeschroder/Desktop/Projects/Pred-casualties/PopDens", "/gpw-v4-population-density-rev10_2000_2pt5_min_tif/gpw_v4_population_density_rev10_2000_2pt5_min.tif"))
+  ext = raster::extent(c(-125, -67, 24, 50))
+  PopDens = crop(rb, ext)
+  PopDens2000 = projectRaster(PopDens, crs = "+proj=lcc +lat_1=50 +lat_2=50 +lat_0=50 +lon_0=-107 +x_0=0 +y_0=0 +a=6371200 +b=6371200 +units=m +no_defs")
+#2005 Data: 
+    rb <- raster(paste0("/Users/zoeschroder/Desktop/Projects/Pred-casualties/PopDens", "/gpw-v4-population-density-rev10_2005_2pt5_min_tif/gpw_v4_population_density_rev10_2005_2pt5_min.tif"))
+  ext = raster::extent(c(-125, -67, 24, 50))
+  PopDens = crop(rb, ext)
+  PopDens2005 = projectRaster(PopDens, crs = "+proj=lcc +lat_1=50 +lat_2=50 +lat_0=50 +lon_0=-107 +x_0=0 +y_0=0 +a=6371200 +b=6371200 +units=m +no_defs")
+#2010 Data: 
+    rb <- raster(paste0("/Users/zoeschroder/Desktop/Projects/Pred-casualties/PopDens", "/gpw-v4-population-density-rev10_2010_2pt5_min_tif/gpw_v4_population_density_rev10_2010_2pt5_min.tif"))
+  ext = raster::extent(c(-125, -67, 24, 50))
+  PopDens = crop(rb, ext)
+  PopDens2010 = projectRaster(PopDens, crs = "+proj=lcc +lat_1=50 +lat_2=50 +lat_0=50 +lon_0=-107 +x_0=0 +y_0=0 +a=6371200 +b=6371200 +units=m +no_defs")
+#2015 Data: 
+    rb <- raster(paste0("/Users/zoeschroder/Desktop/Projects/Pred-casualties/PopDens", "/gpw-v4-population-density-rev10_2015_2pt5_min_tif/gpw_v4_population_density_rev10_2015_2pt5_min.tif"))
+  ext = raster::extent(c(-125, -67, 24, 50))
+  PopDens = crop(rb, ext)
+  PopDens2015 = projectRaster(PopDens, crs = "+proj=lcc +lat_1=50 +lat_2=50 +lat_0=50 +lon_0=-107 +x_0=0 +y_0=0 +a=6371200 +b=6371200 +units=m +no_defs")
+```
+
+Use the `extract` function to obtain the population density.
+```{r, eval = FALSE}
+avgPopDens <- numeric()
+maxPopDens <- numeric()
+
+library(raster)
+for(i in 1:dim(BigDays.sfdfT)[1]){
+  print(i)
+  if (BigDays.sfdfT$PopDensyear[i] == 1995) {
+  avgPopDens <- c(avgPopDens, as.numeric(raster::extract(PopDens1995, BigDays.sfdfT[i, ], fun = mean, na.rm = TRUE, weights = TRUE, normalizeWeights = FALSE)))
+  maxPopDens <- c(maxPopDens, as.numeric(raster::extract(PopDens1995, BigDays.sfdfT[i, ], fun = max, na.rm = TRUE))) 
+  } else if (BigDays.sfdfT$PopDensyear[i] == 2000){
+  avgPopDens <- c(avgPopDens, as.numeric(raster::extract(PopDens2000, BigDays.sfdfT[i,], fun = mean, na.rm = TRUE, weights = TRUE, normalizeWeights = FALSE)))
+  maxPopDens <- c(maxPopDens, as.numeric(raster::extract(PopDens2000, BigDays.sfdfT[i,], fun = max, na.rm = TRUE)))
+  } else if (BigDays.sfdfT$PopDensyear[i] == 2005){
+  avgPopDens <- c(avgPopDens, as.numeric(raster::extract(PopDens2005, BigDays.sfdfT[i,], fun = mean, na.rm = TRUE, weights = TRUE, normalizeWeights = FALSE)))
+  maxPopDens <- c(maxPopDens, as.numeric(raster::extract(PopDens2005, BigDays.sfdfT[i,], fun = max, na.rm = TRUE)))
+  } else if (BigDays.sfdfT$PopDensyear[i] == 2010){
+  avgPopDens <- c(avgPopDens, as.numeric(raster::extract(PopDens2010, BigDays.sfdfT[i,], fun = mean, na.rm = TRUE, weights = TRUE, normalizeWeights = FALSE)))
+  maxPopDens <- c(maxPopDens, as.numeric(raster::extract(PopDens2010, BigDays.sfdfT[i,], fun = max, na.rm = TRUE)))
+  } else if (BigDays.sfdfT$PopDensyear[i] == 2015){
+  avgPopDens <- c(avgPopDens, as.numeric(raster::extract(PopDens2015, BigDays.sfdfT[i,], fun = mean, na.rm = TRUE, weights = TRUE, normalizeWeights = FALSE)))
+  maxPopDens <- c(maxPopDens, as.numeric(raster::extract(PopDens2015, BigDays.sfdfT[i,], fun = max, na.rm = TRUE)))
+  }
+}
+```
+max(avgPopDens) = 333.7982
+min(avgPopDens) = 0.7072632
+max(maxPopDens) = 12509.19
+min(maxPopDens) = 1.506823 
+ 
+Add the max and avg population density values to the Big Day data: 
+```{r, eval = FALSE}
+BigDays.sfdfT <- cbind(BigDays.sfdfT, avgPopDens) 
+BigDays.sfdfT <- cbind(BigDays.sfdfT, maxPopDens) 
 ```
 
 Save the data. 
 ```{r}
-#save(BigDays.sfdfT, file = "BigDays.RData")
+#rm(BS.rl, CAPE.rl, casualty, CIN.rl, counties, counties.sf, ext, HLCY.rl, m1, m2, m3, m4, m5, m6, m7, model1, model2, percM, PopDens, PopDens1995, PopDens2000, PopDens2005, PopDens2010, PopDens2015, RATIO.rl, rb, space, stateBorders, Torn.sf, tree, USTM.rl, VSTM.rl, x, BigDayCentroids.sfdfT, avgBS, avgCAPE, avgCIN, avgHLCY, avgPopDens, avgRATIO, avgUSTM, avgVSTM, bigdays, bigdaytimes, dst, ef, EW3, groupNumber, groups, i, maxBS, maxCAPE, maxCIN, maxHLCY, maxPopDens, maxUSTM, maxVSTM, midptW, minCIN, NARRday, NARRZtime, perc, slug, slug2, stime, sts, threshW, time, mround, weights)
+#BigDays.sfdfT <- within(BigDays.sfdfT, rm(predATE))
+
+#save.image(file = "BigDays.RData")
 load("BigDays.RData")
 dim(BigDays.sfdfT)
 ```
+
 
 ############
 ## MODELS ##
@@ -522,37 +609,37 @@ m1 <- lmer(log(GroupTotalED) ~ I(Year - 2004) + (1|Month),
              data = BigDays.sfdfT)
 summary(m1)
 
-m2 <- lmer(log(GroupTotalED) ~ I(Year - 2004) + (1|Month) + mCAPE2,
+m2 <- lmer(log(GroupTotalED) ~ I(Year - 2004) + (1|Month) + maxCAPE2,
              weights = nT, 
              data = BigDays.sfdfT)
 summary(m2) # No to average CAPE
 
-m3 <- lmer(log(GroupTotalED) ~ I(Year - 2004) + (1|Month) + mBS2,
+m3 <- lmer(log(GroupTotalED) ~ I(Year - 2004) + (1|Month) + maxBS2,
              weights = nT, 
              data = BigDays.sfdfT)
 summary(m3) #No to average 
 
-m4 <- lmer(log(GroupTotalED) ~ I(Year - 2004) + (1|Month) + mHLCY2,
+m4 <- lmer(log(GroupTotalED) ~ I(Year - 2004) + (1|Month) + maxHLCY2,
              weights = nT, 
              data = BigDays.sfdfT)
 summary(m4) # No to average
 
-m5 <- lmer(log(GroupTotalED) ~ I(Year - 2004) + (1|Month) + aHLCY2,
+m5 <- lmer(log(GroupTotalED) ~ I(Year - 2004) + (1|Month) + avgHLCY2,
              weights = nT, 
              data = BigDays.sfdfT)
 summary(m5) # No to average
 
-m6 <- lmer(log(GroupTotalED) ~ I(Year - 2004) + (1|Month) + mCIN2,
+m6 <- lmer(log(GroupTotalED) ~ I(Year - 2004) + (1|Month) + minCIN2,
              weights = nT, 
              data = BigDays.sfdfT)
 summary(m6) # No to average
 
-m6 <- lmer(log(GroupTotalED) ~ I(Year - 2004) + (1|Month) + mCAPE2 * mHLCY2,
+m6 <- lmer(log(GroupTotalED) ~ I(Year - 2004) + (1|Month) + maxCAPE2 * maxHLCY2,
              weights = nT, 
              data = BigDays.sfdfT)
 summary(m6)
 
-m7 <- lmer(log(GroupTotalED) ~ I(Year - 2004) + (1|Month) + mCAPE2 * mCIN2,
+m7 <- lmer(log(GroupTotalED) ~ I(Year - 2004) + (1|Month) + maxCAPE2 * minCIN2,
              weights = nT, 
              data = BigDays.sfdfT)
 summary(m7) # No interaction with CAPE and CIN needed
@@ -560,13 +647,13 @@ summary(m7) # No interaction with CAPE and CIN needed
 
 ```{r}
 model1 <- lmer(log(GroupTotalED) ~ I(Year - 2004) + (1|Month) + 
-                  mBS2 + mCAPE2*mHLCY2,
+                  maxBS2 + maxCAPE2*maxHLCY2,
              weights = nT, 
              data = BigDays.sfdfT)
 summary(model1)
 
 model2 <- lmer(log(GroupTotalED) ~ I(Year - 2004) + (1|Month) + 
-                  mBS2 + mCAPE2 + mHLCY2,
+                  maxBS2 + maxCAPE2 + maxHLCY2,
              weights = nT, 
              data = BigDays.sfdfT)
 summary(model2)
@@ -576,25 +663,25 @@ confint(model1, method = "Wald")
 ```
 
 Plots for the interaction term. **NEED to FIX**
-```{r}
+```{r, eval = FALSE}
 library(interplot)
-out.df <- interplot(m = model1, var1 = "mCAPE2", var2 = "mHLCY2", plot = FALSE)
+out.df <- interplot(m = model1, var1 = "maxCAPE2", var2 = "maxHLCY2", plot = FALSE)
 
 out.df <- out.df %>%
-  mutate(mHLCY = mHLCY2 * 100,
+  mutate(maxHLCY = maxHLCY2 * 100,
          coef2 = (exp(coef) - 1) * 100,
          lb2 = (exp(lb) - 1) * 100,
          ub2 = (exp(ub) - 1) * 100)
 
-p1 <- ggplot(out.df, aes(x = mHLCY, y = coef2)) +
+p1 <- ggplot(out.df, aes(x = maxHLCY, y = coef2)) +
   geom_line() +
-  geom_ribbon(aes(x = mHLCY, ymin = lb2, ymax = ub2), fill = "gray70", alpha = .3) +
+  geom_ribbon(aes(x = maxHLCY, ymin = lb2, ymax = ub2), fill = "gray70", alpha = .3) +
   scale_x_continuous(limits = c(-500, 0)) +
   xlab(expression(paste("CIN [J/kg]"))) + 
   ylab("CAPE's Effect on Accumulated Tornado Energy\n[% Increase/1000 J/kg]") +
   theme_minimal()
 
-p2 <- ggplot(BigDays.sfdfT, aes(x = mHLCY)) +
+p2 <- ggplot(BigDays.sfdfT, aes(x = maxHLCY)) +
   geom_histogram(fill = "gray70", color = "white") +
   scale_x_continuous(limits = c(-500, 0)) +
   theme_void()
@@ -604,16 +691,16 @@ p2 + p1 + plot_layout(ncol = 1, heights = c(1, 6))
 ```
 
 Locate specific values on the plot. **NEED to FIX**
-```{r}
+```{r, eval = FALSE}
 # CIN at 250 J/kg
-(exp(approx(x = out.df$mCIN2, y = out.df$coef, xout = -2.5)$y) - 1) * 100
-(exp(approx(x = out.df$mCIN2, y = out.df$ub, xout = -2.5)$y) - 1) * 100
-(exp(approx(x = out.df$mCIN2, y = out.df$lb, xout = -2.5)$y) - 1) * 100
+(exp(approx(x = out.df$minCIN2, y = out.df$coef, xout = -2.5)$y) - 1) * 100
+(exp(approx(x = out.df$minCIN2, y = out.df$ub, xout = -2.5)$y) - 1) * 100
+(exp(approx(x = out.df$minCIN2, y = out.df$lb, xout = -2.5)$y) - 1) * 100
 
 # CIN at 50 J/kg
-(exp(approx(x = out.df$mCIN2, y = out.df$coef, xout = -.5)$y) - 1) * 100
-(exp(approx(x = out.df$mCIN2, y = out.df$ub, xout = -.5)$y) - 1) * 100
-(exp(approx(x = out.df$mCIN2, y = out.df$lb, xout = -.5)$y) - 1) * 100
+(exp(approx(x = out.df$minCIN2, y = out.df$coef, xout = -.5)$y) - 1) * 100
+(exp(approx(x = out.df$minCIN2, y = out.df$ub, xout = -.5)$y) - 1) * 100
+(exp(approx(x = out.df$minCIN2, y = out.df$lb, xout = -.5)$y) - 1) * 100
 ```
 
 Table of coefficients.
@@ -625,8 +712,8 @@ xtable(x$coefficients, digits = 3)
 
 Observed versus predicted.
 ```{r}
-BigDays.sfdfT$preATE <- exp(predict(model1))
-cor(BigDays.sfdfT$preATE, BigDays.sfdfT$GroupTotalED)
+BigDays.sfdfT$predATE <- exp(predict(model1))
+cor(BigDays.sfdfT$predATE, BigDays.sfdfT$GroupTotalED)
 ```
 
 Observed versus prediction plot for ATE.
@@ -639,13 +726,13 @@ model1.df <- fortify(model1)
 model1.df2 <- model1.df %>%
   filter(abs(.scresid) >= 1.7)
 
-ggplot(model1.df, aes(x = GroupTotalED/10^9, y = preATE/10^9, color = log10(casualties + 1))) +
+ggplot(model1.df, aes(x = GroupTotalED/10^9, y = predATE/10^9, color = log10(casualties + 1))) +
         # geom_smooth(method = lm, color = "black", size = .4, se = FALSE) +
 #         scale_color_viridis_c(guide = FALSE, direction = -1) +
          scale_color_continuous(guide = FALSE) +
          geom_point(size = 2) + 
          geom_abline(slope = 1, size = 1) +
-         #geom_label_repel(aes(x = GroupDayTotalED/10^9, y = preATE/10^9, label = as.character(cDate)), color = "black", data = model1.df2, size = 6) +
+         #geom_label_repel(aes(x = GroupDayTotalED/10^9, y = predATE/10^9, label = as.character(cDate)), color = "black", data = model1.df2, size = 6) +
          scale_x_log10(limits = c(1, 300000), breaks = c(1, 10, 100, 1000, 10000, 100000), labels = c(1, 10, "100", "1000", "10,000", "100,000")) +
          scale_y_log10(limits = c(1, 300000), breaks = c(1, 10, 100, 1000, 10000, 100000), labels = c(1, 10, "100", "1000", "10,000", "100,000")) +
   ylab("Predicted ATE [GW]") + xlab("ATE [GW]") +
@@ -653,101 +740,6 @@ ggplot(model1.df, aes(x = GroupTotalED/10^9, y = preATE/10^9, color = log10(casu
 ```
 
 Try to predict ATE using our casualties. Pop density on the right side. 
-
-########################
-## Population Density ##
-########################
-
-You need to establish a population density for each big day. Round the year to the nearest 10. Example: 1995 should round to 2000 census and 1993 should round to 1990 census. 
-
-Create a function to round to the nearest 5 since we can get population for every 5 years starting 1995 - 2015. 
-```{r}
-mround <- function(x,base){ 
-        base*round(x/base) 
-} 
-```
-
-Add a new column `roundyear` to the dataset. This will round each year to the nearest 5th year. 
-```{r}
-BigDays.sfdfT <- BigDays.sfdfT %>%
-  mutate(roundyear = mround(Year, 5))
-```
-
-```{r}
-avgPopDens <- numeric()
-maxPopDens <- numeric()
-
-library(raster)
-for(i in 1:dim(BigDays.sfdfT)[1]){
-  print(i)
-  if (BigDays.sfdfT$roundyear[i] == 1995) {
-  rb <- raster("/Users/zoeschroder/Desktop/Projects/Pred-casualties/PopDens/usadens/usads95g/w001001.adf")
-  ext = raster::extent(c(-125, -67, 24, 50))
-  PopDens = crop(rb, ext)
-  PopDens.rl = projectRaster(PopDens, crs = "+proj=lcc +lat_1=50 +lat_2=50 +lat_0=50 +lon_0=-107 +x_0=0 +y_0=0 +a=6371200 +b=6371200 +units=m +no_defs")
-  avgPopDens <- c(avgPopDens, as.numeric(raster::extract(PopDens.rl, BigDays.sfdfT[i, ], fun = mean)))
-  maxPopDens <- c(maxPopDens, as.numeric(raster::extract(PopDens.rl, BigDays.sfdfT[i, ], fun = max))) 
-  } else {
-  rb <- raster(paste0("/Users/zoeschroder/Desktop/Projects/Pred-casualties/PopDens", "/gpw-v4-population-density-rev10_", BigDays.sfdfT$roundyear[i], "_30_sec_tif/gpw_v4_population_density_rev10_", BigDays.sfdfT$roundyear[i], "_30_sec.tif"))
-  ext = raster::extent(c(-125, -67, 24, 50))
-  PopDens = crop(rb, ext)
-  PopDens.rl = projectRaster(PopDens, crs = "+proj=lcc +lat_1=50 +lat_2=50 +lat_0=50 +lon_0=-107 +x_0=0 +y_0=0 +a=6371200 +b=6371200 +units=m +no_defs")
-  avgPopDens <- c(avgPopDens, as.numeric(raster::extract(PopDens.rl, BigDays.sfdfT[i,], fun = mean, na.rm = TRUE, weights = TRUE, normalizeWeights = FALSE)))
-  maxPopDens <- c(maxPopDens, as.numeric(raster::extract(PopDens.rl, BigDays.sfdfT[i,], fun = max, na.rm = TRUE, weights = TRUE, normalizeWeights = FALSE)))
-  }
-}
-```
- 
-Begin with The Gridded Population of the World Volume 3 data. This data set has population density data available beginning in 1990 and ending in 2000. 
-```{r}
-#TornLs = subset(TornL, date == "2011-04-27")
-TornP = gBuffer(BigDays.sfdfT[i,])
-Pop = raster("/Users/tylerfricker/Dropbox/Tyler/usadens/usads00g/w001001.adf")
-Popp = projectRaster(PopDens, crs = proj4string(TornP))
-TornP$popD = as.vector(raster::extract(Popp, TornP, fun = mean, na.rm = TRUE,
-                                       weights = FALSE, normalizeWeights = FALSE))
-TornP$pop = TornP$popD * TornP$AreaPath/10^6
-Torn.df = as.data.frame(TornP)
-```
-
-Population data are obtained from the Gridded Population of the World, version four (GPW, v4) from the Socioeconomic Data and Applications Center at Columbia University, USA. The database contain decennial census density estimates for 1990, 2000, and 2010 represented as people per square kilometer. Densities are based on residential population. The native cell resolution is .0083$^{\circ}$ latitude/longitude, which at 36$^{\circ}$ N latitude means a cell having the dimension of .9 km in the north-south direction and .7 km in the east-west direction. 
-
-Load the population raster(s) and crop to defined extent. Use the `extract` function to obtain the population density. The `projectRaster` and `extract` functions take about 10 minutes per raster. Group years by mid-year of the census year. Assign the population density using the first decennial estimate then successively replace with later estimates by grouped years.
-```{r}
-stime = proc.time()
-PopD2000 = raster("gpw-v4-population-density_2000.tif")
-PopD2010 = raster("gpw-v4-population-density_2010.tif")
-ext = raster::extent(c(-125, -67, 24, 50))
-PopD2000 = crop(PopD2000, ext)
-PopD2010 = crop(PopD2010, ext)
-
-PopD2000p = projectRaster(PopD2000, crs = proj4string(TornP))
-PopD2010p = projectRaster(PopD2010, crs = proj4string(TornP))
-TornP$popD2000 = raster::extract(PopD2000p, TornP, fun = mean, na.rm = TRUE,
-                                       weights = TRUE, normalizeWeights = FALSE)[, 1]
-TornP$popD2010 = raster::extract(PopD2010p, TornP, fun = mean, na.rm = TRUE,
-                                       weights = TRUE, normalizeWeights = FALSE)[, 1]
-TornP$popD = TornP$popD2000
-yearGroup = TornP$yr > 2005
-TornP$popD[yearGroup] = TornP$popD2010[yearGroup]
-
-TornP$pop = TornP$popD * TornP$AreaPath/10^6
-
-Torn.df = as.data.frame(TornP)
-proc.time() - stime
-```
-
-Begin with The Gridded Population of the World Volume 3 data (2000).
-```{r}
-#TornLs = subset(TornL, date == "2011-04-27")
-TornP = gBuffer(TornL, byid = TRUE, width = TornL$Width/2, capStyle = "FLAT")
-Pop = raster("/Users/tylerfricker/Dropbox/Tyler/usadens/usads00g/w001001.adf")
-Popp = projectRaster(Pop, crs = proj4string(TornP))
-TornP$popD = as.vector(raster::extract(Popp, TornP, fun = mean, na.rm = TRUE,
-                                       weights = FALSE, normalizeWeights = FALSE))
-TornP$pop = TornP$popD * TornP$AreaPath/10^6
-Torn.df = as.data.frame(TornP)
-```
 
 
 Note: The warning results from tornadoes with paths over areas with no people. It can be safely ignored.
@@ -758,30 +750,6 @@ For the set of 2208 tornadoes with at least one casualty the median population d
 
 1 mi^2 = 2.589988 km^2
 http://mcdc.missouri.edu/TenThings/urbanrural.shtml
-
-```{r}
-Torn.df %>%
-  summarize(nT = n(),
-            avgPopD = mean(popD),
-            medianPopD = median(popD),
-            q25 = quantile(popD, probs = .25),
-            q75 = quantile(popD, probs = .75),
-            maxPopD = max(popD),
-            minPopD = min(popD)) %>%
-  t()
-
-Torn.df %>%
-  dplyr::select(date, st, mag, inj, fat, cas, popD) %>%
-  arrange(desc(popD)) %>%
-  head(., n = 10) %>%
-  xtable(., digits = 0)
-
-sum(Torn.df$popD == 0)
-
-df = Torn.df %>%
-  filter(yr >= 1990 & yr <= 2001) %>%
-  summarize(totalPop = sum(pop))
-```
 
 Annual average number of people exposed to tornadoes that caused at least one casualty.
 ```{r}
@@ -810,4 +778,4 @@ A = ggplot(df, aes(x = Year, y = mPop)) +
 The SPC archive data extends from January 23, 2003 to present. (https://www.spc.noaa.gov/archive/)
 
 Data File Example: 
-https://www.spc.noaa.gov/cgi-bin-spc/getacrange.pl?date0=20110426&date1=20110426&csrf=0e9284c1e6fff8bc469a08cd5379c18197cc4fec/day1otlk_20110426_1630-shp.zip 
+https://www.spc.noaa.gov/cgi-bin-spc/getacrange.pl?date0=20110426&date1=20110426&csrf=0e9284c1e6fff8bc469a08cd5379c18197cc4fec/day1otlk_20110426_1630-shp.zip
