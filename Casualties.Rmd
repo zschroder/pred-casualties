@@ -312,15 +312,13 @@ Get the casualty count by state.
 ```{r, eval = FALSE}
 casualty <- Torn.sfT %>%
   group_by(st) %>%
-  summarize(cas = n())
-
-casualty[30:40, ]
+  summarize(cas = sum(cas))
 ```
 
 Manipulate the data to add casualty count by state to the `us_states()` data frame from the **USAboundaries** package. 
 ```{r, eval = FALSE}
 missstates <- c("AZ", "CA", "ID", "NV", "OR", "RI", "UT", "WA", "DC")
-misscas <- as.integer(rep(0, 13))
+misscas <- as.integer(rep(0, 9))
 
 missing <- cbind(missstates, misscas)
 
@@ -363,11 +361,19 @@ tm_shape(states.sf) +
   tm_layout( legend.text.size = .75)
 ```
 
+Table the number of Big Days, casualty counts, and ED in TW by year. 
+
+```{r}
+Torn.sfT %>%
+  group_by(yr) %>%
+  summarize(nBD = n(), cas = sum(cas), energyTW = sum(ED/10^12))
+```
+
 Time Series of casualty counts.
 ```{r, eval = FALSE}
 Torn.sfT %>%
   group_by(Year) %>%
-  summarize(cas = n()) %>%
+  summarize(cas = sum(cas)) %>%
 ggplot(., aes(x = Year, y = cas)) + 
   geom_line() +
   geom_point() +
@@ -598,9 +604,9 @@ dim(BigDays.sfdfT)
 ```
 
 
-############
-## MODELS ##
-############
+####################
+## MODELS FOR ATE ##
+####################
 
 ```{r}
 library(lme4)
@@ -741,16 +747,9 @@ ggplot(model1.df, aes(x = GroupTotalED/10^9, y = predATE/10^9, color = log10(cas
 
 Try to predict ATE using our casualties. Pop density on the right side. 
 
-
-Note: The warning results from tornadoes with paths over areas with no people. It can be safely ignored.
-
-The `popD` attribute for each tornado corresponds to the population density from the nearest decennial estimate so that a tornado that occurred in 1996 uses the 2000 decennial estimate while a tornado that occurred in 2012 uses the 2010 estimate.
-
-For the set of 2208 tornadoes with at least one casualty the median population density per tornado is 31.3 people per square kilometer with an inter-quartile range between 9.6 and 136 people per square kilometer.
-
-1 mi^2 = 2.589988 km^2
-http://mcdc.missouri.edu/TenThings/urbanrural.shtml
-
+###########################
+## MODELS FOR CASUALTIES ##
+###########################
 Annual average number of people exposed to tornadoes that caused at least one casualty.
 ```{r}
 df = Torn.df %>%
