@@ -697,6 +697,7 @@ p2 <- ggplot(BigDays.sfdfT, aes(x = maxHLCY)) +
 library(patchwork)
 p2 + p1 + plot_layout(ncol = 1, heights = c(2, 6))
 ```
+** Issue: The May 30, 2003 event has a HLCY value of 14000. The closest value to that big day is 1026. Creates a huge outlier. How do we account for this?**
 
 Table of coefficients.
 ```{r}
@@ -793,33 +794,22 @@ model1 <- lmer(casualties ~ I(maxPopDens/100) + (1|Month) + maxBS2 + maxCAPE2 * 
              data = BigDays.sfdfT)
 summary(model1)
 
-model2 <- lmer(casualties ~ I(maxPopDens/100) + (1|Month) + maxBS2 + maxCAPE2 * maxHLCY2 + minCIN2,
+model2 <- lmer(casualties ~ I(maxPopDens/100) + (1|Month) + maxBS2 + maxCAPE2 + maxHLCY2 + minCIN2,
              weights = nT, 
              data = BigDays.sfdfT)
 summary(model2)
 
-model3 <- lmer(casualties ~ I(maxPopDens/100) + (1|Month) + maxBS2 + minCIN2 + maxHLCY2,
+model3 <- lmer(casualties ~ I(maxPopDens/100) + (1|Month) + maxBS2 + maxCAPE2 * maxHLCY2 + minCIN2,
              weights = nT, 
              data = BigDays.sfdfT)
 summary(model3)
 
-model4 <- lmer(casualties ~ I(maxPopDens/100) + (1|Month) + maxBS2 + maxCAPE2 + maxHLCY2 + minCIN2,
-             weights = nT, 
-             data = BigDays.sfdfT)
-summary(model4)
-
-
-model5 <- lmer(log(GroupTotalED) ~ I(Year - 2004) + (1|Month) + 
-                  maxBS2 + maxCAPE2 + maxHLCY2,
-             weights = nT, 
-             data = BigDays.sfdfT)
-summary(model5)
-
-AIC(model1, model2, model3, model4, model5)
-confint(model3, method = "Wald")
+AIC(model1, model2,  model3)
+confint(model1, method = "Wald")
 ```
+** Issue: The May 30, 2003 event has a HLCY value of 14000. The closest value to that big day is 1026. Creates a huge outlier. How do we account for this?**
 
-Plots for the interaction term. **NEED to FIX???**
+Plots for the interaction term. **NEED to FIX...won't plot because values are WAY too large**
 ```{r, eval = FALSE}
 library(interplot)
 out.df <- interplot(m = model1, var1 = "maxCAPE2", var2 = "maxHLCY2", plot = FALSE)
