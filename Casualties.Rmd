@@ -582,10 +582,11 @@ for(i in 1:dim(BigDays.sfdfT)[1]){
   }
 }
 ```
-max(avgPopDens) = 333.7982
-min(avgPopDens) = 0.7072632
-max(maxPopDens) = 12509.19
-min(maxPopDens) = 1.506823 
+
+max(BigDays.sfdfT$avgPopDens) = 333.7982
+min(BigDays.sfdfT$avgPopDens) = 0.7072632
+max(BigDays.sfdfT$maxPopDens) = 12509.19
+min(BigDays.sfdfT$maxPopDens) = 1.506823 
  
 Add the max and avg population density values to the Big Day data: 
 ```{r, eval = FALSE}
@@ -607,7 +608,7 @@ dim(BigDays.sfdfT)
 ####################
 ## MODELS FOR ATE ##
 ####################
-
+Check it variable as a predictor of ATE
 ```{r}
 library(lme4)
 m1 <- lmer(log(GroupTotalED) ~ I(Year - 2004) + (1|Month),
@@ -650,10 +651,10 @@ m7 <- lmer(log(GroupTotalED) ~ I(Year - 2004) + (1|Month) + maxCAPE2 * minCIN2,
              data = BigDays.sfdfT)
 summary(m7) # No interaction with CAPE and CIN needed
 ```
-
+Fit the best models using the significant predictors. 
 ```{r}
 model1 <- lmer(log(GroupTotalED) ~ I(Year - 2004) + (1|Month) + 
-                  maxBS2 + maxCAPE2*maxHLCY2,
+                  maxBS2 + maxCAPE2 * maxHLCY2,
              weights = nT, 
              data = BigDays.sfdfT)
 summary(model1)
@@ -667,8 +668,9 @@ summary(model2)
 AIC(model1, model2)
 confint(model1, method = "Wald")
 ```
+Model 1 has the lowest AIC. This is the model with the CAPE and HLCY interaction. 
 
-Plots for the interaction term. **NEED to FIX**
+Plots for the interaction term. **NEED to FIX???**
 ```{r, eval = FALSE}
 library(interplot)
 out.df <- interplot(m = model1, var1 = "maxCAPE2", var2 = "maxHLCY2", plot = FALSE)
@@ -682,31 +684,18 @@ out.df <- out.df %>%
 p1 <- ggplot(out.df, aes(x = maxHLCY, y = coef2)) +
   geom_line() +
   geom_ribbon(aes(x = maxHLCY, ymin = lb2, ymax = ub2), fill = "gray70", alpha = .3) +
-  scale_x_continuous(limits = c(-500, 0)) +
-  xlab(expression(paste("CIN [J/kg]"))) + 
+  scale_x_continuous(limits = c(0, 15000)) +
+  xlab(expression(paste("Helicity [m2/s2]"))) + 
   ylab("CAPE's Effect on Accumulated Tornado Energy\n[% Increase/1000 J/kg]") +
   theme_minimal()
 
 p2 <- ggplot(BigDays.sfdfT, aes(x = maxHLCY)) +
   geom_histogram(fill = "gray70", color = "white") +
-  scale_x_continuous(limits = c(-500, 0)) +
+  scale_x_continuous(limits = c(0, 1500)) +
   theme_void()
 
 library(patchwork)
-p2 + p1 + plot_layout(ncol = 1, heights = c(1, 6))
-```
-
-Locate specific values on the plot. **NEED to FIX**
-```{r, eval = FALSE}
-# CIN at 250 J/kg
-(exp(approx(x = out.df$minCIN2, y = out.df$coef, xout = -2.5)$y) - 1) * 100
-(exp(approx(x = out.df$minCIN2, y = out.df$ub, xout = -2.5)$y) - 1) * 100
-(exp(approx(x = out.df$minCIN2, y = out.df$lb, xout = -2.5)$y) - 1) * 100
-
-# CIN at 50 J/kg
-(exp(approx(x = out.df$minCIN2, y = out.df$coef, xout = -.5)$y) - 1) * 100
-(exp(approx(x = out.df$minCIN2, y = out.df$ub, xout = -.5)$y) - 1) * 100
-(exp(approx(x = out.df$minCIN2, y = out.df$lb, xout = -.5)$y) - 1) * 100
+p2 + p1 + plot_layout(ncol = 1, heights = c(2, 6))
 ```
 
 Table of coefficients.
@@ -745,29 +734,187 @@ ggplot(model1.df, aes(x = GroupTotalED/10^9, y = predATE/10^9, color = log10(cas
   theme_minimal() + theme(text = element_text(size=15))
 ```
 
-Try to predict ATE using our casualties. Pop density on the right side. 
-
 ###########################
 ## MODELS FOR CASUALTIES ##
 ###########################
-Annual average number of people exposed to tornadoes that caused at least one casualty.
+
+Generate the Models for predicting casualties. First look at the individual variables and their influence on big day casualties. 
 ```{r}
-df = Torn.df %>%
-  filter(cas > 0) %>%
-  group_by(Year) %>%
-  summarize(nT = n(),
-            mPop = mean(pop),
-            sdPop = sd(pop),
-            sePop = sdPop/sqrt(nT),
-            mPopm = mPop - sePop,
-            mPopp = mPop + sePop)
-A = ggplot(df, aes(x = Year, y = mPop)) +
-  geom_point() +
-  geom_errorbar(aes(ymin = mPopm, ymax = mPopp), width = .2) +
-  scale_y_continuous(limits = c(0, 2500)) +
-  scale_x_continuous(breaks = seq(1995, 2016, 4)) +
-  xlab("Year") + ylab("Number of People Exposed") +
+library(lme4)
+m1 <- lmer(casualties ~ I(Year - 2004) + I(maxPopDens/100) + (1|Month),
+             weights = nT, 
+             data = BigDays.sfdfT)
+summary(m1)
+
+m2 <- lmer(casualties ~ I(maxPopDens/100) + (1|Month) + maxCAPE2,
+             weights = nT, 
+             data = BigDays.sfdfT)
+summary(m2) # No to average CAPE
+
+m3 <- lmer(casualties ~ I(maxPopDens/100) + (1|Month) + avgBS2,
+             weights = nT, 
+             data = BigDays.sfdfT)
+summary(m3) #No to average 
+
+m4 <- lmer(casualties ~ I(maxPopDens/100) + (1|Month) + maxHLCY2,
+             weights = nT, 
+             data = BigDays.sfdfT)
+summary(m4) # No to average
+
+m5 <- lmer(casualties ~ I(maxPopDens/100) + (1|Month) + avgHLCY2,
+             weights = nT, 
+             data = BigDays.sfdfT)
+summary(m5) # No to average
+
+m6 <- lmer(casualties ~ I(maxPopDens/100) + (1|Month) + avgCIN2,
+             weights = nT, 
+             data = BigDays.sfdfT)
+summary(m6) # No to average
+
+m6 <- lmer(casualties ~ I(maxPopDens/100) + (1|Month) + maxCAPE2 * maxHLCY2,
+             weights = nT, 
+             data = BigDays.sfdfT)
+summary(m6)
+
+m7 <- lmer(casualties ~ I(maxPopDens/100) + (1|Month) + maxCAPE2 * minCIN2,
+             weights = nT, 
+             data = BigDays.sfdfT)
+summary(m7) # No interaction with CAPE and CIN needed
+
+m8 <- lmer(casualties ~ I(maxPopDens/100) + (1|Month) + maxCAPE2 * maxHLCY2 * minCIN2,
+             weights = nT, 
+             data = BigDays.sfdfT)
+summary(m8)
+```
+
+```{r}
+model1 <- lmer(casualties ~ I(maxPopDens/100) + (1|Month) + maxBS2 + maxCAPE2 * maxHLCY2,
+             weights = nT, 
+             data = BigDays.sfdfT)
+summary(model1)
+
+model2 <- lmer(casualties ~ I(maxPopDens/100) + (1|Month) + maxBS2 + maxCAPE2 * maxHLCY2 + minCIN2,
+             weights = nT, 
+             data = BigDays.sfdfT)
+summary(model2)
+
+model3 <- lmer(casualties ~ I(maxPopDens/100) + (1|Month) + maxBS2 + minCIN2 + maxHLCY2,
+             weights = nT, 
+             data = BigDays.sfdfT)
+summary(model3)
+
+model4 <- lmer(casualties ~ I(maxPopDens/100) + (1|Month) + maxBS2 + maxCAPE2 + maxHLCY2 + minCIN2,
+             weights = nT, 
+             data = BigDays.sfdfT)
+summary(model4)
+
+
+model5 <- lmer(log(GroupTotalED) ~ I(Year - 2004) + (1|Month) + 
+                  maxBS2 + maxCAPE2 + maxHLCY2,
+             weights = nT, 
+             data = BigDays.sfdfT)
+summary(model5)
+
+AIC(model1, model2, model3, model4, model5)
+confint(model3, method = "Wald")
+```
+
+Plots for the interaction term. **NEED to FIX???**
+```{r, eval = FALSE}
+library(interplot)
+out.df <- interplot(m = model1, var1 = "maxCAPE2", var2 = "maxHLCY2", plot = FALSE)
+
+out.df <- out.df %>%
+  mutate(maxHLCY = maxHLCY2 * 100,
+         coef2 = (exp(coef) - 1),
+         lb2 = (exp(lb) - 1),
+         ub2 = (exp(ub) - 1))
+
+p1 <- ggplot(out.df, aes(x = maxHLCY, y = coef2)) +
+  geom_line() +
+  geom_ribbon(aes(x = maxHLCY, ymin = lb2, ymax = ub2), fill = "gray70", alpha = .3) +
+  scale_x_continuous(limits = c(0, 15000)) +
+  xlab(expression(paste("Helicity [m2/s2]"))) + 
+  ylab("CAPE's Effect on Accumulated Tornado Energy\n[% Increase/1000 J/kg]") +
   theme_minimal()
+
+p2 <- ggplot(BigDays.sfdfT, aes(x = maxHLCY)) +
+  geom_histogram(fill = "gray70", color = "white") +
+  scale_x_continuous(limits = c(0, 15000)) +
+  theme_void()
+
+library(patchwork)
+p2 + p1 + plot_layout(ncol = 1, heights = c(2, 6))
+```
+
+############
+#14000 HLCY#
+############
+Extract the centroid, hull, and tornadoes for April 21 (i = 188)
+```{r}
+BigDay530 <- BigDays.sfdfT %>%
+  filter(cDate == "2003-05-30")
+
+Torn530 <- Torn.sfT %>%
+  filter(ID == "200305302976")
+
+Hull530 <- st_convex_hull(BigDay530)
+```
+
+Download the environmental data for the April 21, 2001 big day. Convert to a raster and transform the big day data to the same CRS as the environmental factors. 
+```{r}
+rb <- brick(paste0("/Volumes/My Passport for Mac/PhD_Program/NCARNARR/Files/18Z/", Hull530$slug))
+
+cape <- raster(rb, layer = 375)
+hlcy <- raster(rb, layer = 323)
+cin <- raster(rb, layer = 376)
+
+capeLL <- projectRaster(cape, crs = "+init=epsg:4326")
+cinLL <- projectRaster(cin, crs = "+init=epsg:4326")
+hlcyLL <- projectRaster(hlcy, crs = "+init=epsg:4326")
+
+sfdfTll <- st_transform(Hull530, crs = "+init=epsg:4326")
+r <- raster(extent(sfdfTll), resolution = res(capeLL))
+
+nT.r <- rasterize(sfdfTll, r, fun = 'first')
+
+cape.r <- projectRaster(capeLL, nT.r) 
+cin.r <- projectRaster(cinLL, nT.r)
+hlcy.r <- projectRaster(hlcyLL, nT.r)  
+  
+```
+Plot the April 21, 2001 event with the CAPE values
+```{r}
+sts <- state.name[!state.name %in% c("Alaska", "Hawaii")]
+stateBorders <- us_states(states = sts)
+
+counties <- us_counties()
+counties.sf <- counties %>%
+  filter(!state_abbr %in% c("AK", "PR", "HI")) 
+
+tm_shape(hlcy.r) +
+  tm_raster(title = "CAPE (J/kg)", n = 5) +
+tm_shape(Hull530) +
+  tm_borders(col = "red", lwd = 3) +
+tm_shape(BigDay530) +
+  tm_symbols(size = .75, col = "black", shape = 24) +
+tm_shape(Torn530) +
+  tm_symbols(size = 1, col = "red") +
+tm_shape(stateBorders) + 
+  tm_borders(col = "gray15", alpha = 1) +
+  tm_compass(size = 5) +
+  tm_scale_bar(width = 0.5, size = 1.25, lwd = 2) +
+  tm_layout(legend.bg.color = "white", legend.text.size = .75) +
+tm_shape(counties.sf) +
+  tm_borders(col = "gray40", alpha = .3) +
+  tm_scale_bar(width = 8, size = 8) +
+  tm_format("World", legend.position = c("right", "bottom"),
+                   attr.position = c("left", "bottom"),
+                   legend.frame = FALSE,
+                   #title = "April 21st Tornado Group",
+                   #title.size = 1.3,
+                   #title.position = c("left", "TOP"),
+                   inner.margins = c(.2, .2, .2, .2)) 
 ```
 
 ##################
