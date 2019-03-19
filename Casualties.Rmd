@@ -8,6 +8,8 @@ editor_options:
 chunk_output_type: console
 ---
 
+Part 2: predicting casualties using environmental factors on big tornado days
+
 Set working directory and load packages. Suppress the messages so they do not clutter the screen! 
 ```{r}
 suppressMessages(library(lubridate))
