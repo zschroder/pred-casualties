@@ -193,7 +193,7 @@ BigDays.sfdfT %>%
   summarize(count = n())
 ```
 
-Create a downloadable string of information for the varying NARR times. DON'T USE
+Create a downloadable string of information for the varying NARR times. 
 ```{r, eval = FALSE}
 BigDays.sfdfT <- BigDays.sfdfT %>%
   mutate(YrMoDa = gsub("/", "", NARRday),
@@ -432,6 +432,7 @@ avgCIN <- numeric()
 avgUSTM <- numeric()
 avgVSTM <- numeric()
 avgBS <- numeric()
+avgSM <- numeric()
 avgRATIO <- numeric()
 maxCAPE <- numeric()
 maxHLCY <- numeric()
@@ -439,32 +440,39 @@ minCIN <- numeric()
 maxUSTM <- numeric()
 maxVSTM <- numeric()
 maxBS <- numeric()
+maxSM <- numeric()
  
 library(raster)
 for(i in 1:length(slug)){
   print(i)
   rb <- brick(paste0("/Volumes/My Passport for Mac/NCARNARR/All/", BigDays.sfdfT$slug2[i], "/",BigDays.sfdfT$slug[i])) #<-- this is for varying NARR times
-   #rb <- brick(paste0("/Volumes/My Passport for Mac/PhD_Program/NCARNARR/Files/18Z/", BigDays.sfdfT$slug[i]))
-  CAPE.rl <- raster(rb, layer = 375)
-  HLCY.rl <- raster(rb, layer = 323)
-  CIN.rl <- raster(rb, layer = 376)
-  USTM.rl <- raster(rb, layer = 324)
-  VSTM.rl <- raster(rb, layer = 325)
-  BS.rl <- sqrt(USTM.rl^2 + VSTM.rl^2)
-  RATIO.rl <- CAPE.rl/abs(CIN.rl)
-  avgCAPE <- c(avgCAPE, as.numeric(raster::extract(CAPE.rl, BigDays.sfdfT[i, ], fun = mean)))
-  avgHLCY <- c(avgHLCY, as.numeric(raster::extract(HLCY.rl, BigDays.sfdfT[i, ], fun = mean)))
-  avgCIN <- c(avgCIN, as.numeric(raster::extract(CIN.rl, BigDays.sfdfT[i, ], fun = mean)))
-  avgUSTM <- c(avgUSTM, as.numeric(raster::extract(USTM.rl, BigDays.sfdfT[i, ], fun = mean)))
-  avgVSTM <- c(avgVSTM, as.numeric(raster::extract(VSTM.rl, BigDays.sfdfT[i, ], fun = mean)))
-  avgBS <- c(avgBS, as.numeric(raster::extract(BS.rl, BigDays.sfdfT[i, ], fun = mean)))
-  avgRATIO <- c(avgRATIO, as.numeric(raster::extract(RATIO.rl, BigDays.sfdfT[i, ], fun = mean)))
-  maxCAPE <- c(maxCAPE, as.numeric(raster::extract(CAPE.rl, BigDays.sfdfT[i, ], fun = max)))
-  maxHLCY <- c(maxHLCY, as.numeric(raster::extract(HLCY.rl, BigDays.sfdfT[i, ], fun = max)))
-  minCIN <- c(minCIN, as.numeric(raster::extract(CIN.rl, BigDays.sfdfT[i, ], fun = min)))
-  maxUSTM <- c(maxUSTM, as.numeric(raster::extract(USTM.rl, BigDays.sfdfT[i, ], fun = max)))
-  maxVSTM <- c(maxVSTM, as.numeric(raster::extract(VSTM.rl, BigDays.sfdfT[i, ], fun = max)))
-  maxBS <- c(maxBS, as.numeric(raster::extract(BS.rl, BigDays.sfdfT[i, ], fun = max)))
+  CAPE <- raster(rb, layer = 375)
+  HLCY <- raster(rb, layer = 323)
+  CIN <- raster(rb, layer = 376)
+  USTM <- raster(rb, layer = 324)
+  VSTM <- raster(rb, layer = 325)
+  UGRD500 <- raster(rb, layer = 117) 
+  VGRD500 <- raster(rb, layer = 118) 
+  UGRDsfc <- raster(rb, layer = 293) 
+  VGRDsfc <- raster(rb, layer = 294)     
+  SM <- sqrt(USTM^2 + VSTM^2)
+  RATIO <- CAPE/abs(CIN)
+  BS <- sqrt(((UGRD500 - UGRDsfc)**2) + ((VGRD500 - VGRDsfc)**2))
+  avgCAPE <- c(avgCAPE, as.numeric(raster::extract(CAPE, BigDays.sfdfT[i, ], fun = mean)))
+  avgHLCY <- c(avgHLCY, as.numeric(raster::extract(HLCY, BigDays.sfdfT[i, ], fun = mean)))
+  avgCIN <- c(avgCIN, as.numeric(raster::extract(CIN, BigDays.sfdfT[i, ], fun = mean)))
+  avgUSTM <- c(avgUSTM, as.numeric(raster::extract(USTM, BigDays.sfdfT[i, ], fun = mean)))
+  avgVSTM <- c(avgVSTM, as.numeric(raster::extract(VSTM, BigDays.sfdfT[i, ], fun = mean)))
+  avgSM <- c(avgSM, as.numeric(raster::extract(SM, BigDays.sfdfT[i, ], fun = mean)))
+  avgRATIO <- c(avgRATIO, as.numeric(raster::extract(RATIO, BigDays.sfdfT[i, ], fun = mean)))
+  avgBS <- c(avgBS, as.numeric(raster::extract(BS, BigDays.sfdfT[i, ], fun = mean)))
+  maxCAPE <- c(maxCAPE, as.numeric(raster::extract(CAPE, BigDays.sfdfT[i, ], fun = max)))
+  maxHLCY <- c(maxHLCY, as.numeric(raster::extract(HLCY, BigDays.sfdfT[i, ], fun = max)))
+  minCIN <- c(minCIN, as.numeric(raster::extract(CIN, BigDays.sfdfT[i, ], fun = min)))
+  maxUSTM <- c(maxUSTM, as.numeric(raster::extract(USTM, BigDays.sfdfT[i, ], fun = max)))
+  maxVSTM <- c(maxVSTM, as.numeric(raster::extract(VSTM, BigDays.sfdfT[i, ], fun = max)))
+  maxSM <- c(maxSM, as.numeric(raster::extract(SM, BigDays.sfdfT[i, ], fun = max)))
+  maxBS <- c(maxBS, as.numeric(raster::extract(BS, BigDays.sfdfT[i, ], fun = max)))
 }
 ```
 
@@ -477,12 +485,14 @@ BigDays.sfdfT$avgUSTM <- avgUSTM
 BigDays.sfdfT$avgVSTM <- avgVSTM
 BigDays.sfdfT$avgBS <- avgBS
 BigDays.sfdfT$avgRATIO <- avgRATIO
+BigDays.sfdfT$avgSM <- avgSM
 BigDays.sfdfT$maxCAPE <- maxCAPE
 BigDays.sfdfT$maxHLCY <- maxHLCY
 BigDays.sfdfT$minCIN <- minCIN
 BigDays.sfdfT$maxUSTM <- maxUSTM
 BigDays.sfdfT$maxVSTM <- maxVSTM
 BigDays.sfdfT$maxBS <- maxBS
+BigDays.sfdfT$maxSM <- maxSM
 ```
 
 Scale the variables to make them easier to read and input for models. 
@@ -493,6 +503,7 @@ BigDays.sfdfT$avgCIN2 <- BigDays.sfdfT$avgCIN/100
 BigDays.sfdfT$avgBS2 <- BigDays.sfdfT$avgBS/10
 BigDays.sfdfT$avgUSTM2 <- BigDays.sfdfT$avgUSTM/10
 BigDays.sfdfT$avgVSTM2 <- BigDays.sfdfT$avgVSTM/10
+BigDays.sfdfT$avgSM2 <- BigDays.sfdfT$avgSM/10
 
 BigDays.sfdfT$maxCAPE2 <- BigDays.sfdfT$maxCAPE/1000
 BigDays.sfdfT$maxHLCY2 <- BigDays.sfdfT$maxHLCY/100
@@ -500,6 +511,7 @@ BigDays.sfdfT$minCIN2 <- BigDays.sfdfT$minCIN/100
 BigDays.sfdfT$maxBS2 <- BigDays.sfdfT$maxBS/10
 BigDays.sfdfT$maxUSTM2 <- BigDays.sfdfT$maxUSTM/10
 BigDays.sfdfT$maxVSTM2 <- BigDays.sfdfT$maxVSTM/10
+BigDays.sfdfT$maxSM2 <- BigDays.sfdfT$maxSM/10
 ```
 
 ########################
@@ -530,27 +542,27 @@ Population Data for 2000 through 2015 are obtained from the Gridded Population o
 Load the population raster(s) and crop to defined extent. 
 ```{r, eval = FALSE}
 #1995 Data: 
-  rb <- raster("/Users/zoeschroder/Desktop/Projects/Pred-casualties/PopDens/usadens/usads95g/w001001.adf")
+  rb <- raster("/Volumes/My Passport for Mac/PhD_Program/Projects/Pred-casualties/PopDens/usadens/usads95g/w001001.adf")
   ext = raster::extent(c(-125, -67, 24, 50))
   PopDens = crop(rb, ext)
   PopDens1995 = projectRaster(PopDens, crs = "+proj=lcc +lat_1=50 +lat_2=50 +lat_0=50 +lon_0=-107 +x_0=0 +y_0=0 +a=6371200 +b=6371200 +units=m +no_defs")
 #2000 Data: 
-  rb <- raster(paste0("/Users/zoeschroder/Desktop/Projects/Pred-casualties/PopDens", "/gpw-v4-population-density-rev10_2000_2pt5_min_tif/gpw_v4_population_density_rev10_2000_2pt5_min.tif"))
+  rb <- raster(paste0("/Volumes/My Passport for Mac/PhD_Program/Projects/Pred-casualties/PopDens", "/gpw-v4-population-density-rev10_2000_2pt5_min_tif/gpw_v4_population_density_rev10_2000_2pt5_min.tif"))
   ext = raster::extent(c(-125, -67, 24, 50))
   PopDens = crop(rb, ext)
   PopDens2000 = projectRaster(PopDens, crs = "+proj=lcc +lat_1=50 +lat_2=50 +lat_0=50 +lon_0=-107 +x_0=0 +y_0=0 +a=6371200 +b=6371200 +units=m +no_defs")
 #2005 Data: 
-    rb <- raster(paste0("/Users/zoeschroder/Desktop/Projects/Pred-casualties/PopDens", "/gpw-v4-population-density-rev10_2005_2pt5_min_tif/gpw_v4_population_density_rev10_2005_2pt5_min.tif"))
+    rb <- raster(paste0("/Volumes/My Passport for Mac/PhD_Program/Projects/Pred-casualties/PopDens", "/gpw-v4-population-density-rev10_2005_2pt5_min_tif/gpw_v4_population_density_rev10_2005_2pt5_min.tif"))
   ext = raster::extent(c(-125, -67, 24, 50))
   PopDens = crop(rb, ext)
   PopDens2005 = projectRaster(PopDens, crs = "+proj=lcc +lat_1=50 +lat_2=50 +lat_0=50 +lon_0=-107 +x_0=0 +y_0=0 +a=6371200 +b=6371200 +units=m +no_defs")
 #2010 Data: 
-    rb <- raster(paste0("/Users/zoeschroder/Desktop/Projects/Pred-casualties/PopDens", "/gpw-v4-population-density-rev10_2010_2pt5_min_tif/gpw_v4_population_density_rev10_2010_2pt5_min.tif"))
+    rb <- raster(paste0("/Volumes/My Passport for Mac/PhD_Program/Projects/Pred-casualties/PopDens", "/gpw-v4-population-density-rev10_2010_2pt5_min_tif/gpw_v4_population_density_rev10_2010_2pt5_min.tif"))
   ext = raster::extent(c(-125, -67, 24, 50))
   PopDens = crop(rb, ext)
   PopDens2010 = projectRaster(PopDens, crs = "+proj=lcc +lat_1=50 +lat_2=50 +lat_0=50 +lon_0=-107 +x_0=0 +y_0=0 +a=6371200 +b=6371200 +units=m +no_defs")
 #2015 Data: 
-    rb <- raster(paste0("/Users/zoeschroder/Desktop/Projects/Pred-casualties/PopDens", "/gpw-v4-population-density-rev10_2015_2pt5_min_tif/gpw_v4_population_density_rev10_2015_2pt5_min.tif"))
+    rb <- raster(paste0("/Volumes/My Passport for Mac/PhD_Program/Projects/Pred-casualties/PopDens", "/gpw-v4-population-density-rev10_2015_2pt5_min_tif/gpw_v4_population_density_rev10_2015_2pt5_min.tif"))
   ext = raster::extent(c(-125, -67, 24, 50))
   PopDens = crop(rb, ext)
   PopDens2015 = projectRaster(PopDens, crs = "+proj=lcc +lat_1=50 +lat_2=50 +lat_0=50 +lon_0=-107 +x_0=0 +y_0=0 +a=6371200 +b=6371200 +units=m +no_defs")
@@ -560,6 +572,7 @@ Use the `extract` function to obtain the population density.
 ```{r, eval = FALSE}
 avgPopDens <- numeric()
 maxPopDens <- numeric()
+totalPopDens <- numeric()
 
 library(raster)
 for(i in 1:dim(BigDays.sfdfT)[1]){
@@ -567,18 +580,23 @@ for(i in 1:dim(BigDays.sfdfT)[1]){
   if (BigDays.sfdfT$PopDensyear[i] == 1995) {
   avgPopDens <- c(avgPopDens, as.numeric(raster::extract(PopDens1995, BigDays.sfdfT[i, ], fun = mean, na.rm = TRUE, weights = TRUE, normalizeWeights = FALSE)))
   maxPopDens <- c(maxPopDens, as.numeric(raster::extract(PopDens1995, BigDays.sfdfT[i, ], fun = max, na.rm = TRUE))) 
+  totalPopDens <- c(totalPopDens, as.numeric(raster::extract(PopDens1995, BigDays.sfdfT[i, ], fun = sum, na.rm = TRUE))) 
   } else if (BigDays.sfdfT$PopDensyear[i] == 2000){
   avgPopDens <- c(avgPopDens, as.numeric(raster::extract(PopDens2000, BigDays.sfdfT[i,], fun = mean, na.rm = TRUE, weights = TRUE, normalizeWeights = FALSE)))
   maxPopDens <- c(maxPopDens, as.numeric(raster::extract(PopDens2000, BigDays.sfdfT[i,], fun = max, na.rm = TRUE)))
+  totalPopDens <- c(totalPopDens, as.numeric(raster::extract(PopDens1995, BigDays.sfdfT[i, ], fun = sum, na.rm = TRUE))) 
   } else if (BigDays.sfdfT$PopDensyear[i] == 2005){
   avgPopDens <- c(avgPopDens, as.numeric(raster::extract(PopDens2005, BigDays.sfdfT[i,], fun = mean, na.rm = TRUE, weights = TRUE, normalizeWeights = FALSE)))
   maxPopDens <- c(maxPopDens, as.numeric(raster::extract(PopDens2005, BigDays.sfdfT[i,], fun = max, na.rm = TRUE)))
+  totalPopDens <- c(totalPopDens, as.numeric(raster::extract(PopDens1995, BigDays.sfdfT[i, ], fun = sum, na.rm = TRUE))) 
   } else if (BigDays.sfdfT$PopDensyear[i] == 2010){
   avgPopDens <- c(avgPopDens, as.numeric(raster::extract(PopDens2010, BigDays.sfdfT[i,], fun = mean, na.rm = TRUE, weights = TRUE, normalizeWeights = FALSE)))
   maxPopDens <- c(maxPopDens, as.numeric(raster::extract(PopDens2010, BigDays.sfdfT[i,], fun = max, na.rm = TRUE)))
+  totalPopDens <- c(totalPopDens, as.numeric(raster::extract(PopDens1995, BigDays.sfdfT[i, ], fun = sum, na.rm = TRUE))) 
   } else if (BigDays.sfdfT$PopDensyear[i] == 2015){
   avgPopDens <- c(avgPopDens, as.numeric(raster::extract(PopDens2015, BigDays.sfdfT[i,], fun = mean, na.rm = TRUE, weights = TRUE, normalizeWeights = FALSE)))
   maxPopDens <- c(maxPopDens, as.numeric(raster::extract(PopDens2015, BigDays.sfdfT[i,], fun = max, na.rm = TRUE)))
+  totalPopDens <- c(totalPopDens, as.numeric(raster::extract(PopDens1995, BigDays.sfdfT[i, ], fun = sum, na.rm = TRUE))) 
   }
 }
 ```
@@ -592,18 +610,26 @@ Add the max and avg population density values to the Big Day data:
 ```{r, eval = FALSE}
 BigDays.sfdfT <- cbind(BigDays.sfdfT, avgPopDens) 
 BigDays.sfdfT <- cbind(BigDays.sfdfT, maxPopDens) 
+BigDays.sfdfT <- cbind(BigDays.sfdfT, totalPopDens) 
 ```
 
 Save the data. 
 ```{r}
-#rm(BS.rl, CAPE.rl, casualty, CIN.rl, counties, counties.sf, ext, HLCY.rl, m1, m2, m3, m4, m5, m6, m7, model1, model2, percM, PopDens, PopDens1995, PopDens2000, PopDens2005, PopDens2010, PopDens2015, RATIO.rl, rb, space, stateBorders, Torn.sf, tree, USTM.rl, VSTM.rl, x, BigDayCentroids.sfdfT, avgBS, avgCAPE, avgCIN, avgHLCY, avgPopDens, avgRATIO, avgUSTM, avgVSTM, bigdays, bigdaytimes, dst, ef, EW3, groupNumber, groups, i, maxBS, maxCAPE, maxCIN, maxHLCY, maxPopDens, maxUSTM, maxVSTM, midptW, minCIN, NARRday, NARRZtime, perc, slug, slug2, stime, sts, threshW, time, mround, weights)
-#BigDays.sfdfT <- within(BigDays.sfdfT, rm(predATE))
-
+save(BigDays.sfdfT, Torn.sfT, file = "BigDays.RData")
 #save.image(file = "BigDays.RData")
 load("BigDays.RData")
 dim(BigDays.sfdfT)
 ```
 
+```{r}
+x <- BigDays.sfdfT[-c(8,22, 25:29, 46:59)]
+BigDays <- x
+
+y <- Torn.sfT[-c(19:20,22,25:26,32)]
+BigDayTornadoes <- y
+
+save(BigDays, BigDayTornadoes, file = "outbreakdays.RData")
+```
 
 ####################
 ## MODELS FOR ATE ##
@@ -655,7 +681,7 @@ summary(m7) # No interaction with CAPE and CIN needed
 Fit the best models using the significant predictors. 
 ```{r}
 model1 <- lmer(log(GroupTotalED) ~ I(Year - 2004) + (1|Month) + 
-                  maxBS2 + minCIN2 + maxCAPE2 * maxHLCY2,
+                  maxBS2 + minCIN2 * maxCAPE2 * maxHLCY2,
              weights = nT, 
              data = BigDays.sfdfT)
 summary(model1)
