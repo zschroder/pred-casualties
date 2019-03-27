@@ -208,7 +208,7 @@ Extract a vector of the big days. Save as a .csv for NARR download.
 bigdays <- BigDays.sfdfT$NARRday
 bigdaytimes <- BigDays.sfdfT$NARRZtime
 x <- cbind(as.character(bigdays), as.character(bigdaytimes))
-write.csv(x, "BigDays.csv")
+#write.csv(x, "BigDays.csv")
 ```
 
 ```{r, eval = FALSE}
@@ -233,8 +233,8 @@ BigDayCentroids.sfdfT$groupDensity <- BigDayCentroids.sfdfT$nT/BigDayCentroids.s
 
 Save the Big Days to a file `BigDays.RData`.
 ```{r, eval = FALSE}
-#save(BigDays.sfdfT, file = "BigDays.RData")
-load("BigDays.RData")
+save(BigDays.sfdfT, file = "BigDays2.RData")
+load("BigDays2.RData")
 dim(BigDays.sfdfT)
 ```
 
@@ -247,8 +247,8 @@ Torn.sfT <- Torn.sfT %>%
 
 Save the Tornadoes to a file `BigDayTornadoes.RData`.
 ```{r, eval = FALSE}
-#save(Torn.sfT, file = "BigDayTornadoes.RData")
-load("BigDayTornadoes.RData")
+save(Torn.sfT, file = "BigDayTornadoes2.RData")
+load("BigDayTornadoes2.RData")
 dim(Torn.sfT)
 ```
 
@@ -365,7 +365,7 @@ tm_shape(states.sf) +
 
 Table the number of Big Days, casualty counts, and ED in TW by year. 
 
-```{r}
+```{r, eval = FALSE}
 Torn.sfT %>%
   group_by(yr) %>%
   summarize(nBD = n(), cas = sum(cas), energyTW = sum(ED/10^12))
@@ -447,7 +447,7 @@ maxSM <- numeric()
 library(raster)
 for(i in 1:length(slug)){
   print(i)
-  rb <- brick(paste0("/Volumes/My Passport for Mac/NCARNARR/All/", BigDays.sfdfT$slug2[i], "/",BigDays.sfdfT$slug[i])) #<-- this is for varying NARR times
+  rb <- brick(paste0("/Volumes/Zoe's Drive/NCARNARR/All/", BigDays.sfdfT$slug2[i], "/",BigDays.sfdfT$slug[i])) #<-- this is for varying NARR times
   CAPE <- raster(rb, layer = 375)
   HLCY <- raster(rb, layer = 323)
   CIN <- raster(rb, layer = 376)
@@ -514,6 +514,12 @@ BigDays.sfdfT$maxBS2 <- BigDays.sfdfT$maxBS/10
 BigDays.sfdfT$maxUSTM2 <- BigDays.sfdfT$maxUSTM/10
 BigDays.sfdfT$maxVSTM2 <- BigDays.sfdfT$maxVSTM/10
 BigDays.sfdfT$maxSM2 <- BigDays.sfdfT$maxSM/10
+```
+
+```{r, eval = FALSE}
+save(BigDays.sfdfT, file = "BigDays2.RData")
+load("BigDays2.RData")
+dim(BigDays.sfdfT)
 ```
 
 ########################
