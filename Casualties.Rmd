@@ -247,7 +247,7 @@ Torn.sfT <- Torn.sfT %>%
 
 Save the Tornadoes to a file `BigDayTornadoes.RData`.
 ```{r, eval = FALSE}
-save(Torn.sfT, file = "BigDayTornadoes2.RData")
+#save(Torn.sfT, file = "BigDayTornadoes2.RData")
 load("BigDayTornadoes2.RData")
 dim(Torn.sfT)
 ```
@@ -447,7 +447,7 @@ maxSM <- numeric()
 library(raster)
 for(i in 1:length(slug)){
   print(i)
-  rb <- brick(paste0("/Volumes/Zoe's Drive/NCARNARR/All/", BigDays.sfdfT$slug2[i], "/",BigDays.sfdfT$slug[i])) #<-- this is for varying NARR times
+  rb <- brick(paste0("/Volumes/Zoe's Home/NCARNARR/All/", BigDays.sfdfT$slug2[i], "/",BigDays.sfdfT$slug[i])) #<-- this is for varying NARR times
   CAPE <- raster(rb, layer = 375)
   HLCY <- raster(rb, layer = 323)
   CIN <- raster(rb, layer = 376)
@@ -550,27 +550,27 @@ Population Data for 2000 through 2015 are obtained from the Gridded Population o
 Load the population raster(s) and crop to defined extent. 
 ```{r, eval = FALSE}
 #1995 Data: 
-  rb <- raster("/Volumes/My Passport for Mac/PhD_Program/Projects/Pred-casualties/PopDens/usadens/usads95g/w001001.adf")
+  rb <- raster("/Volumes/Zoe's Drive/PhD_Program/Projects/Pred-casualties/PopDens/usadens/usads95g/w001001.adf")
   ext = raster::extent(c(-125, -67, 24, 50))
   PopDens = crop(rb, ext)
   PopDens1995 = projectRaster(PopDens, crs = "+proj=lcc +lat_1=50 +lat_2=50 +lat_0=50 +lon_0=-107 +x_0=0 +y_0=0 +a=6371200 +b=6371200 +units=m +no_defs")
 #2000 Data: 
-  rb <- raster(paste0("/Volumes/My Passport for Mac/PhD_Program/Projects/Pred-casualties/PopDens", "/gpw-v4-population-density-rev10_2000_2pt5_min_tif/gpw_v4_population_density_rev10_2000_2pt5_min.tif"))
+  rb <- raster(paste0("/Volumes/Zoe's Drive/PhD_Program/Projects/Pred-casualties/PopDens", "/gpw-v4-population-density-rev10_2000_2pt5_min_tif/gpw_v4_population_density_rev10_2000_2pt5_min.tif"))
   ext = raster::extent(c(-125, -67, 24, 50))
   PopDens = crop(rb, ext)
   PopDens2000 = projectRaster(PopDens, crs = "+proj=lcc +lat_1=50 +lat_2=50 +lat_0=50 +lon_0=-107 +x_0=0 +y_0=0 +a=6371200 +b=6371200 +units=m +no_defs")
 #2005 Data: 
-    rb <- raster(paste0("/Volumes/My Passport for Mac/PhD_Program/Projects/Pred-casualties/PopDens", "/gpw-v4-population-density-rev10_2005_2pt5_min_tif/gpw_v4_population_density_rev10_2005_2pt5_min.tif"))
+    rb <- raster(paste0("/Volumes/Zoe's Drive/PhD_Program/Projects/Pred-casualties/PopDens", "/gpw-v4-population-density-rev10_2005_2pt5_min_tif/gpw_v4_population_density_rev10_2005_2pt5_min.tif"))
   ext = raster::extent(c(-125, -67, 24, 50))
   PopDens = crop(rb, ext)
   PopDens2005 = projectRaster(PopDens, crs = "+proj=lcc +lat_1=50 +lat_2=50 +lat_0=50 +lon_0=-107 +x_0=0 +y_0=0 +a=6371200 +b=6371200 +units=m +no_defs")
 #2010 Data: 
-    rb <- raster(paste0("/Volumes/My Passport for Mac/PhD_Program/Projects/Pred-casualties/PopDens", "/gpw-v4-population-density-rev10_2010_2pt5_min_tif/gpw_v4_population_density_rev10_2010_2pt5_min.tif"))
+    rb <- raster(paste0("/Volumes/Zoe's Drive/PhD_Program/Projects/Pred-casualties/PopDens", "/gpw-v4-population-density-rev10_2010_2pt5_min_tif/gpw_v4_population_density_rev10_2010_2pt5_min.tif"))
   ext = raster::extent(c(-125, -67, 24, 50))
   PopDens = crop(rb, ext)
   PopDens2010 = projectRaster(PopDens, crs = "+proj=lcc +lat_1=50 +lat_2=50 +lat_0=50 +lon_0=-107 +x_0=0 +y_0=0 +a=6371200 +b=6371200 +units=m +no_defs")
 #2015 Data: 
-    rb <- raster(paste0("/Volumes/My Passport for Mac/PhD_Program/Projects/Pred-casualties/PopDens", "/gpw-v4-population-density-rev10_2015_2pt5_min_tif/gpw_v4_population_density_rev10_2015_2pt5_min.tif"))
+    rb <- raster(paste0("/Volumes/Zoe's Drive/PhD_Program/Projects/Pred-casualties/PopDens", "/gpw-v4-population-density-rev10_2015_2pt5_min_tif/gpw_v4_population_density_rev10_2015_2pt5_min.tif"))
   ext = raster::extent(c(-125, -67, 24, 50))
   PopDens = crop(rb, ext)
   PopDens2015 = projectRaster(PopDens, crs = "+proj=lcc +lat_1=50 +lat_2=50 +lat_0=50 +lon_0=-107 +x_0=0 +y_0=0 +a=6371200 +b=6371200 +units=m +no_defs")
@@ -623,7 +623,7 @@ BigDays.sfdfT <- cbind(BigDays.sfdfT, totalPopDens)
 
 Save the data. 
 ```{r}
-save(BigDays.sfdfT, Torn.sfT, file = "BigDays.RData")
+#save(BigDays.sfdfT, Torn.sfT, file = "BigDays.RData")
 #save.image(file = "BigDays.RData")
 load("BigDays.RData")
 dim(BigDays.sfdfT)
