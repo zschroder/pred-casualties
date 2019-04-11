@@ -233,8 +233,8 @@ BigDayCentroids.sfdfT$groupDensity <- BigDayCentroids.sfdfT$nT/BigDayCentroids.s
 
 Save the Big Days to a file `BigDays.RData`.
 ```{r, eval = FALSE}
-save(BigDays.sfdfT, file = "BigDays2.RData")
-load("BigDays2.RData")
+#save(BigDays.sfdfT, file = "BigDays.RData")
+#load("BigDays.RData")
 dim(BigDays.sfdfT)
 ```
 
@@ -243,13 +243,6 @@ Pull out the individual tornadoes associated with each Big Day.
 groups <- BigDays.sfdfT$ID
 Torn.sfT <- Torn.sfT %>%
   filter(ID %in% groups) 
-```
-
-Save the Tornadoes to a file `BigDayTornadoes.RData`.
-```{r, eval = FALSE}
-#save(Torn.sfT, file = "BigDayTornadoes2.RData")
-load("BigDayTornadoes2.RData")
-dim(Torn.sfT)
 ```
 
 #######################
@@ -517,8 +510,8 @@ BigDays.sfdfT$maxSM2 <- BigDays.sfdfT$maxSM/10
 ```
 
 ```{r, eval = FALSE}
-save(BigDays.sfdfT, file = "BigDays2.RData")
-load("BigDays2.RData")
+#save(BigDays.sfdfT, file = "BigDays.RData")
+#load("BigDays.RData")
 dim(BigDays.sfdfT)
 ```
 
@@ -624,8 +617,7 @@ BigDays.sfdfT <- cbind(BigDays.sfdfT, totalPopDens)
 Save the data. 
 ```{r}
 #save(BigDays.sfdfT, Torn.sfT, file = "BigDays.RData")
-#save.image(file = "BigDays.RData")
-load("BigDays.RData")
+#load("BigDays.RData")
 dim(BigDays.sfdfT)
 ```
 
